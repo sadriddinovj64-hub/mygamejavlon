@@ -1,0 +1,273 @@
+export interface CharacterOutfit {
+  id: string;
+  name: string;
+  price: number;
+  suitColor: number;
+  armorColor: number;
+  accentColor: number;
+  glowColor: number;
+  description: string;
+}
+
+export interface CharacterItem {
+  id: string;
+  name: string;
+  role: string;
+  price: number;
+  description: string;
+  modelStyle: 'bolt' | 'titan' | 'valkyrie' | 'shinobi' | 'paladin';
+  outfits: CharacterOutfit[];
+}
+
+export const CHARACTERS_CATALOG: CharacterItem[] = [
+  {
+    id: 'bolt',
+    name: 'Apex Bolt',
+    role: 'Kiber Yuguruvchi (Speed Runner)',
+    price: 0,
+    description: 'Tezkor va epchil kiber yuguruvchi. Harakatlanishi juda ravon.',
+    modelStyle: 'bolt',
+    outfits: [
+      {
+        id: 'bolt_default',
+        name: 'Kiber Moviy (Default)',
+        price: 0,
+        suitColor: 0x2563eb,
+        armorColor: 0x1e293b,
+        accentColor: 0x38bdf8,
+        glowColor: 0x00f0ff,
+        description: 'Klassik kiber yuguruvchi formasi.',
+      },
+      {
+        id: 'bolt_crimson',
+        name: 'Qizil Olov (Crimson)',
+        price: 60,
+        suitColor: 0xdc2626,
+        armorColor: 0x450a0a,
+        accentColor: 0xf87171,
+        glowColor: 0xff4444,
+        description: 'Olovli chaqqon qizil libos.',
+      },
+      {
+        id: 'bolt_emerald',
+        name: 'Zumrad Tezlik (Emerald)',
+        price: 100,
+        suitColor: 0x059669,
+        armorColor: 0x064e3b,
+        accentColor: 0x34d399,
+        glowColor: 0x10b981,
+        description: 'Yashil yashin tezligidagi sport kiyimi.',
+      },
+      {
+        id: 'bolt_gold',
+        name: 'Oltin Elita (Gold Master)',
+        price: 180,
+        suitColor: 0xd97706,
+        armorColor: 0x451a03,
+        accentColor: 0xfbbf24,
+        glowColor: 0xfacc15,
+        description: 'Haqiqiy chempionlar uchun oltin qoplamali libos.',
+      },
+    ],
+  },
+  {
+    id: 'titan',
+    name: 'Titan Mech',
+    role: 'Og‘ir Zirhli Robot (Heavy Mech)',
+    price: 150,
+    description: 'Baland yelkali mustahkam kiber robot. Massiv va qudratli korpusga ega.',
+    modelStyle: 'titan',
+    outfits: [
+      {
+        id: 'titan_default',
+        name: 'Po‘lat Titan (Steel)',
+        price: 0,
+        suitColor: 0x475569,
+        armorColor: 0x0f172a,
+        accentColor: 0x94a3b8,
+        glowColor: 0x38bdf8,
+        description: 'Zarbdor po‘lat zirhli robot korpusi.',
+      },
+      {
+        id: 'titan_magma',
+        name: 'Magma Yadro (Magma Lava)',
+        price: 80,
+        suitColor: 0xea580c,
+        armorColor: 0x431407,
+        accentColor: 0xfb923c,
+        glowColor: 0xff3b00,
+        description: 'Vulqon kuchi bilan qizdirilgan og‘ir zirh.',
+      },
+      {
+        id: 'titan_toxic',
+        name: 'Zaharli Kripton (Toxic Green)',
+        price: 120,
+        suitColor: 0x15803d,
+        armorColor: 0x052e16,
+        accentColor: 0x4ade80,
+        glowColor: 0x22c55e,
+        description: 'Kripton energiyasi bilan to‘yingan zirh.',
+      },
+      {
+        id: 'titan_gold',
+        name: 'Imperator Zirhi (Golden Fortress)',
+        price: 200,
+        suitColor: 0xb45309,
+        armorColor: 0x271306,
+        accentColor: 0xfcd34d,
+        glowColor: 0xffd700,
+        description: 'Imperator gvardiyasi uchun og‘ir oltin qurol-aslahalar.',
+      },
+    ],
+  },
+  {
+    id: 'valkyrie',
+    name: 'Astra Valkyrie',
+    role: 'Koinot Qanotli Parisi (Star Valkyrie)',
+    price: 300,
+    description: 'Orqasida energiya qanotlari bo‘lgan kosmik yuguruvchi qahramon qiz.',
+    modelStyle: 'valkyrie',
+    outfits: [
+      {
+        id: 'valkyrie_default',
+        name: 'Koinot Yulduzi (Cosmic Violet)',
+        price: 0,
+        suitColor: 0x7c3aed,
+        armorColor: 0x2e1065,
+        accentColor: 0xc084fc,
+        glowColor: 0xa855f7,
+        description: 'Yulduzlar nuri bilan yaltiraydigan koinot kostyumi.',
+      },
+      {
+        id: 'valkyrie_plasma',
+        name: 'Plazma Pushti (Plasma Pink)',
+        price: 90,
+        suitColor: 0xdb2777,
+        armorColor: 0x500724,
+        accentColor: 0xf472b6,
+        glowColor: 0xff007f,
+        description: 'Yorqin plazma nurlari taratuvchi libos.',
+      },
+      {
+        id: 'valkyrie_arctic',
+        name: 'Muzli Avrora (Frost Aurora)',
+        price: 140,
+        suitColor: 0x0284c7,
+        armorColor: 0x082f49,
+        accentColor: 0x38bdf8,
+        glowColor: 0x7dd3fc,
+        description: 'Arktika qorlari va shamoli kabi tiniq ko‘rinish.',
+      },
+      {
+        id: 'valkyrie_celestial',
+        name: 'Muqaddas Oq (Celestial Light)',
+        price: 240,
+        suitColor: 0xf8fafc,
+        armorColor: 0x334155,
+        accentColor: 0xfde047,
+        glowColor: 0xffffff,
+        description: 'Yorqin oppoq va tilla jiloli muqaddas kiyim.',
+      },
+    ],
+  },
+  {
+    id: 'shinobi',
+    name: 'Kage Shinobi',
+    role: 'Soya Ninjasi (Shadow Shinobi)',
+    price: 500,
+    description: 'Boshida lenta, orqasida ikki qilich va niqobli mohir sharqona jangchi.',
+    modelStyle: 'shinobi',
+    outfits: [
+      {
+        id: 'shinobi_default',
+        name: 'Tungi Soya (Night Shadow)',
+        price: 0,
+        suitColor: 0x18181b,
+        armorColor: 0x09090b,
+        accentColor: 0xef4444,
+        glowColor: 0xff2222,
+        description: 'Tunda ko‘rinmaydigan afsonaviy ninja kiyimi.',
+      },
+      {
+        id: 'shinobi_blood',
+        name: 'Qonli Oy (Blood Moon)',
+        price: 120,
+        suitColor: 0x991b1b,
+        armorColor: 0x450a0a,
+        accentColor: 0xfca5a5,
+        glowColor: 0xef4444,
+        description: 'Qizil qonli oy libosi.',
+      },
+      {
+        id: 'shinobi_ghost',
+        name: 'Oq Arvoh (White Phantom)',
+        price: 180,
+        suitColor: 0xe2e8f0,
+        armorColor: 0x1e293b,
+        accentColor: 0x38bdf8,
+        glowColor: 0x00f0ff,
+        description: 'Ko‘z ilg‘amas oq arvoh libosi.',
+      },
+      {
+        id: 'shinobi_storm',
+        name: 'Yashin Bo‘ron (Thunder Storm)',
+        price: 280,
+        suitColor: 0x1d4ed8,
+        armorColor: 0x172554,
+        accentColor: 0xfacc15,
+        glowColor: 0x3b82f6,
+        description: 'Moviy yashin va momaqaldiroq sadosi ostidagi libos.',
+      },
+    ],
+  },
+  {
+    id: 'paladin',
+    name: 'Solaris Paladin',
+    role: 'Quyosh Ritsari (Sun Paladin)',
+    price: 800,
+    description: 'Boshida quyosh toji, yaltiroq plash va olijanob zarhal zirhli buyuk ritsar.',
+    modelStyle: 'paladin',
+    outfits: [
+      {
+        id: 'paladin_default',
+        name: 'Zarhal Quyosh (Solar Gold)',
+        price: 0,
+        suitColor: 0xf59e0b,
+        armorColor: 0x78350f,
+        accentColor: 0xfef08a,
+        glowColor: 0xffd700,
+        description: 'Sof oltindan yasalgan quyosh ritsari zirhi.',
+      },
+      {
+        id: 'paladin_amethyst',
+        name: 'Qirollik Yoquti (Royal Amethyst)',
+        price: 150,
+        suitColor: 0x7e22ce,
+        armorColor: 0x3b0764,
+        accentColor: 0xd8b4fe,
+        glowColor: 0xa855f7,
+        description: 'Qirollik saroyi oliy ritsarlari kiyimi.',
+      },
+      {
+        id: 'paladin_obsidian',
+        name: 'Qora Tutilish (Dark Eclipse)',
+        price: 220,
+        suitColor: 0x0f172a,
+        armorColor: 0xb45309,
+        accentColor: 0xfbbf24,
+        glowColor: 0xf59e0b,
+        description: 'Qora quyosh tutilishi mahobatli zirhi.',
+      },
+      {
+        id: 'paladin_radiant',
+        name: 'Koinot Nuri (Radiant Dawn)',
+        price: 350,
+        suitColor: 0xffffff,
+        armorColor: 0xd97706,
+        accentColor: 0x38bdf8,
+        glowColor: 0xffffff,
+        description: 'Oppoq nur va oltin qo‘shilgan oliy darajali afsonaviy zirh.',
+      },
+    ],
+  },
+];
