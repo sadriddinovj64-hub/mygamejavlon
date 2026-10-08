@@ -4,9 +4,9 @@ import { GameSettings, GameState, PlayerStats, SavedLevelData } from './types/ga
 import { getLevelConfig } from './utils/levelGenerator';
 import { soundManager } from './utils/audio';
 import { HUD } from './components/HUD';
-import { GameControls } from './components/GameControls';
 import { SettingsModal } from './components/SettingsModal';
 import { ShopModal } from './components/ShopModal';
+import { IntroAnimation } from './components/IntroAnimation';
 import {
   StartScreen,
   PauseScreen,
@@ -60,16 +60,23 @@ export default function App() {
     try {
       const item = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (item) {
-        return JSON.parse(item);
+        const parsed = JSON.parse(item);
+        return {
+          ...parsed,
+          soundEnabled: true,
+          musicEnabled: false,
+          soundVolume: 0.95,
+          musicVolume: 0,
+        };
       }
     } catch {
       // ignore
     }
     return {
       soundEnabled: true,
-      musicEnabled: true,
-      soundVolume: 0.8,
-      musicVolume: 0.35,
+      musicEnabled: false,
+      soundVolume: 0.95,
+      musicVolume: 0,
       quality: 'high',
     };
   });
@@ -92,13 +99,14 @@ export default function App() {
 
   const [damageFlash, setDamageFlash] = useState<boolean>(false);
   const [isNewHigh, setIsNewHigh] = useState<boolean>(false);
+  const [showIntro, setShowIntro] = useState<boolean>(true);
 
   // Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isShopOpen, setIsShopOpen] = useState<boolean>(false);
 
-  // Touch Swipe tracking
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  // Touch & Mouse Swipe tracking (Subway Surfers instant swipe)
+  const touchStartRef = useRef<{ x: number; y: number; swiped: boolean } | null>(null);
 
   const levelConfig = getLevelConfig(1);
 
@@ -153,38 +161,45 @@ export default function App() {
   );
 
   // Cleanup & Initialize 3D Engine for Endless Run
-  const startOrRestartEngine = useCallback(() => {
-    if (engineRef.current) {
-      engineRef.current.destroy();
-      engineRef.current = null;
-    }
+  const startOrRestartEngine = useCallback(
+    (isLobby: boolean = false) => {
+      if (engineRef.current) {
+        engineRef.current.destroy();
+        engineRef.current = null;
+      }
 
-    if (!containerRef.current) return;
+      if (!containerRef.current) return;
 
-    const cfg = {
-      ...getLevelConfig(1),
-      targetDistance: Infinity,
-    };
+      const cfg = {
+        ...getLevelConfig(1),
+        targetDistance: Infinity,
+      };
 
-    const engine = new GameEngine(
-      containerRef.current,
-      cfg,
-      {
-        onStatsUpdate: (newStats) => setStats(newStats),
-        onHealthUpdate: (health) => {
-          setStats((prev) => ({ ...prev, health }));
+      const engine = new GameEngine(
+        containerRef.current,
+        cfg,
+        {
+          onStatsUpdate: (newStats) => setStats(newStats),
+          onHealthUpdate: (health) => {
+            setStats((prev) => ({ ...prev, health }));
+          },
+          onLevelComplete: () => {},
+          onGameOver: handleGameOver,
+          onDamageFlash: handleDamageFlash,
         },
-        onLevelComplete: () => {},
-        onGameOver: handleGameOver,
-        onDamageFlash: handleDamageFlash,
-      },
-      settings.quality,
-      savedData.selectedCharacterId || 'bolt',
-      savedData.selectedOutfitId || 'bolt_default'
-    );
+        settings.quality,
+        savedData.selectedCharacterId || 'bolt',
+        savedData.selectedOutfitId || 'bolt_default'
+      );
 
-    engineRef.current = engine;
-  }, [handleGameOver, handleDamageFlash, settings.quality, savedData.selectedCharacterId, savedData.selectedOutfitId]);
+      if (isLobby) {
+        engine.setLobbyMode(true);
+      }
+
+      engineRef.current = engine;
+    },
+    [handleGameOver, handleDamageFlash, settings.quality, savedData.selectedCharacterId, savedData.selectedOutfitId]
+  );
 
   // Shop Handlers
   const handleBuyCharacter = (charId: string, price: number) => {
@@ -266,18 +281,17 @@ export default function App() {
     };
   }, []);
 
-  // Initialize preview run or start game
+  // Initialize 3D Lobby Preview on first mount
   useEffect(() => {
-    startOrRestartEngine();
-  }, [startOrRestartEngine]);
+    startOrRestartEngine(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Start Playing
   const handleStartGame = () => {
     setGameState('PLAYING');
-    startOrRestartEngine();
-    if (settings.musicEnabled) {
-      soundManager.startMusic();
-    }
+    startOrRestartEngine(false);
+    soundManager.stopMusic();
   };
 
   // Pause & Resume
@@ -298,12 +312,10 @@ export default function App() {
   // Restart Run
   const handleRestartLevel = () => {
     setGameState('PLAYING');
-    startOrRestartEngine();
+    startOrRestartEngine(false);
   };
 
-  const [activeControlKey, setActiveControlKey] = useState<string | null>(null);
-
-  // Keyboard controls with full Latin, Cyrillic, and Arrow/Space key support
+  // Keyboard controls for Laptop / Desktop (Arrow Keys + WASD + Space)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -319,90 +331,117 @@ export default function App() {
       const code = e.code;
       const key = e.key ? e.key.toLowerCase() : '';
 
-      // Chap (Left)
+      // Chap (Left: ArrowLeft or A)
       if (code === 'KeyA' || code === 'ArrowLeft' || key === 'a' || key === 'arrowleft' || key === 'ф') {
         e.preventDefault();
-        setActiveControlKey('left');
         engineRef.current.moveLeft();
       }
-      // O'ng (Right)
+      // O'ng (Right: ArrowRight or D)
       else if (code === 'KeyD' || code === 'ArrowRight' || key === 'd' || key === 'arrowright' || key === 'в') {
         e.preventDefault();
-        setActiveControlKey('right');
         engineRef.current.moveRight();
       }
-      // Tepa: Sakrash (Jump)
+      // Tepa: Sakrash (Jump: ArrowUp, W, or Space)
       else if (code === 'KeyW' || code === 'ArrowUp' || code === 'Space' || key === 'w' || key === 'arrowup' || key === ' ' || key === 'ц') {
         e.preventDefault();
-        setActiveControlKey('jump');
         engineRef.current.jump();
       }
-      // Past: Sirg'anish (Slide)
+      // Past: Sirg'anish (Slide: ArrowDown or S)
       else if (code === 'KeyS' || code === 'ArrowDown' || key === 's' || key === 'arrowdown' || key === 'ы') {
         e.preventDefault();
-        setActiveControlKey('slide');
         engineRef.current.slide();
       }
     };
 
-    const handleKeyUp = () => {
-      setActiveControlKey(null);
-    };
-
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
     };
   }, [gameState]);
 
-  // Touch Swipe Handlers for mobile & Yandex Browser touch
+  // Execute directional swipe action
+  const executeSwipeDelta = (dx: number, dy: number): boolean => {
+    if (!engineRef.current || gameState !== 'PLAYING') return false;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    const minSwipe = 22; // Instant, responsive Subway Surfers swipe threshold
+
+    if (Math.max(absDx, absDy) >= minSwipe) {
+      if (absDx > absDy) {
+        if (dx < 0) engineRef.current.moveLeft();
+        else engineRef.current.moveRight();
+      } else {
+        if (dy < 0) engineRef.current.jump();
+        else engineRef.current.slide();
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // Instant Touch Swipe Handlers for Mobile Phones (Subway Surfers 1:1)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length > 0) {
       touchStartRef.current = {
         x: e.touches[0].clientX,
         y: e.touches[0].clientY,
+        swiped: false,
       };
     }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current || !engineRef.current || gameState !== 'PLAYING') return;
-
-    const touchEnd = e.changedTouches[0];
-    const dx = touchEnd.clientX - touchStartRef.current.x;
-    const dy = touchEnd.clientY - touchStartRef.current.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    const minSwipe = 28;
-
-    if (Math.max(absDx, absDy) > minSwipe) {
-      if (absDx > absDy) {
-        // Horizontal swipe
-        if (dx < 0) engineRef.current.moveLeft();
-        else engineRef.current.moveRight();
-      } else {
-        // Vertical swipe
-        if (dy < 0) engineRef.current.jump();
-        else engineRef.current.slide();
-      }
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || touchStartRef.current.swiped || e.touches.length === 0) return;
+    const dx = e.touches[0].clientX - touchStartRef.current.x;
+    const dy = e.touches[0].clientY - touchStartRef.current.y;
+    if (executeSwipeDelta(dx, dy)) {
+      touchStartRef.current.swiped = true;
     }
+  };
 
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    if (!touchStartRef.current.swiped && e.changedTouches.length > 0) {
+      const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+      const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+      executeSwipeDelta(dx, dy);
+    }
+    touchStartRef.current = null;
+  };
+
+  // Mouse drag swipe fallback for desktop touchpads/screens
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (gameState !== 'PLAYING') return;
+    touchStartRef.current = { x: e.clientX, y: e.clientY, swiped: false };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!touchStartRef.current || touchStartRef.current.swiped) return;
+    const dx = e.clientX - touchStartRef.current.x;
+    const dy = e.clientY - touchStartRef.current.y;
+    if (executeSwipeDelta(dx, dy)) {
+      touchStartRef.current.swiped = true;
+    }
+  };
+
+  const handleMouseUp = () => {
     touchStartRef.current = null;
   };
 
   return (
     <div
-      className="relative w-screen h-screen overflow-hidden bg-slate-950 font-['Outfit',sans-serif] select-none touch-none"
+      className="relative w-screen h-[100dvh] max-h-[100dvh] overflow-hidden bg-slate-950 font-['Outfit',sans-serif] select-none touch-none"
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
     >
       {/* Three.js WebGL Canvas Mount Container */}
       <div
         ref={containerRef}
-        className="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"
+        className="absolute inset-0 w-full h-full z-0"
       />
 
       {/* Screen Damage Vignette Flash */}
@@ -412,24 +451,22 @@ export default function App() {
         }`}
       />
 
-      {/* Active Game HUD */}
+      {/* Active Game HUD (Clean Subway Surfers Screen — No On-Screen Arrow Buttons!) */}
       {gameState === 'PLAYING' && (
-        <>
-          <HUD
-            stats={stats}
-            levelConfig={levelConfig}
-            highScore={savedData.highScore}
-            onPause={handlePause}
-            onOpenShop={() => setIsShopOpen(true)}
-          />
-          <GameControls
-            onLeft={() => engineRef.current?.moveLeft()}
-            onRight={() => engineRef.current?.moveRight()}
-            onJump={() => engineRef.current?.jump()}
-            onSlide={() => engineRef.current?.slide()}
-            activeKey={activeControlKey}
-          />
-        </>
+        <HUD
+          stats={stats}
+          levelConfig={levelConfig}
+          highScore={savedData.highScore}
+          soundEnabled={settings.soundEnabled}
+          onPause={handlePause}
+          onOpenShop={() => setIsShopOpen(true)}
+          onToggleSound={() =>
+            setSettings((s) => {
+              const next = !s.soundEnabled;
+              return { ...s, soundEnabled: next, musicEnabled: next };
+            })
+          }
+        />
       )}
 
       {/* Overlay Screens */}
@@ -443,6 +480,10 @@ export default function App() {
           onOpenShop={() => setIsShopOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onToggleSound={() => setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))}
+          onSelectCharacter={handleSelectCharacter}
+          onBuyCharacter={handleBuyCharacter}
+          onSelectOutfit={handleSelectOutfit}
+          onBuyOutfit={handleBuyOutfit}
         />
       )}
 
@@ -489,6 +530,11 @@ export default function App() {
           onUpdateSettings={(newSettings) => setSettings((s) => ({ ...s, ...newSettings }))}
           onClose={() => setIsSettingsOpen(false)}
         />
+      )}
+
+      {/* Intro Opening Cinematic Animation */}
+      {showIntro && (
+        <IntroAnimation onComplete={() => setShowIntro(false)} />
       )}
     </div>
   );

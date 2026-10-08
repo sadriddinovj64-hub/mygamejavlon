@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { X, ShoppingBag, Check, Lock, Sparkles, Shirt, UserCheck, Shield } from 'lucide-react';
 import { CHARACTERS_CATALOG, CharacterItem, CharacterOutfit } from '../types/character';
 import { soundManager } from '../utils/audio';
+import { buildCharacterRig } from '../game/CharacterModelBuilder';
 
 interface ShopModalProps {
   totalCoins: number;
@@ -75,143 +76,8 @@ export const ShopModal: React.FC<ShopModalProps> = ({
     const modelGroup = new THREE.Group();
     scene.add(modelGroup);
 
-    // Build the 3D model
-    const suitMaterial = new THREE.MeshStandardMaterial({
-      color: previewOutfit.suitColor,
-      roughness: 0.28,
-      metalness: 0.35,
-    });
-    const armorMaterial = new THREE.MeshStandardMaterial({
-      color: previewOutfit.armorColor,
-      roughness: 0.35,
-      metalness: 0.5,
-    });
-    const accentMaterial = new THREE.MeshStandardMaterial({
-      color: previewOutfit.accentColor,
-      roughness: 0.25,
-      metalness: 0.4,
-    });
-    const glowMaterial = new THREE.MeshBasicMaterial({
-      color: previewOutfit.glowColor,
-    });
-
-    const isTitan = previewChar.modelStyle === 'titan';
-    const isValkyrie = previewChar.modelStyle === 'valkyrie';
-    const torsoW = isTitan ? 1.05 : isValkyrie ? 0.72 : 0.8;
-    const torsoH = isTitan ? 1.02 : isValkyrie ? 0.92 : 0.95;
-    const torsoD = isTitan ? 0.62 : isValkyrie ? 0.46 : 0.5;
-
-    // Torso
-    const torsoGeo = new THREE.BoxGeometry(torsoW, torsoH, torsoD);
-    const torso = new THREE.Mesh(torsoGeo, suitMaterial);
-    torso.position.y = 1.1;
-    modelGroup.add(torso);
-
-    // Core
-    const coreGeo = new THREE.CylinderGeometry(isTitan ? 0.2 : 0.14, isTitan ? 0.2 : 0.14, 0.08, 16);
-    coreGeo.rotateX(Math.PI / 2);
-    const core = new THREE.Mesh(coreGeo, glowMaterial);
-    core.position.set(0, 1.2, torsoD / 2 + 0.02);
-    modelGroup.add(core);
-
-    // Head
-    const headSize = isTitan ? 0.62 : 0.52;
-    const headGeo = new THREE.BoxGeometry(headSize, headSize, headSize);
-    const head = new THREE.Mesh(headGeo, armorMaterial);
-    head.position.y = isTitan ? 1.9 : 1.85;
-    modelGroup.add(head);
-
-    // Specific Headgear & Accessories
-    if (previewChar.modelStyle === 'bolt') {
-      const vGeo = new THREE.BoxGeometry(0.48, 0.16, 0.1);
-      const vMesh = new THREE.Mesh(vGeo, glowMaterial);
-      vMesh.position.set(0, 1.88, 0.24);
-      modelGroup.add(vMesh);
-
-      const packGeo = new THREE.BoxGeometry(0.5, 0.58, 0.26);
-      const packMesh = new THREE.Mesh(packGeo, armorMaterial);
-      packMesh.position.set(0, 1.15, -0.34);
-      modelGroup.add(packMesh);
-    } else if (previewChar.modelStyle === 'titan') {
-      [-0.32, 0.32].forEach((hx) => {
-        const hornGeo = new THREE.ConeGeometry(0.1, 0.35, 6);
-        hornGeo.rotateZ(hx < 0 ? -0.45 : 0.45);
-        const horn = new THREE.Mesh(hornGeo, accentMaterial);
-        horn.position.set(hx, 2.25, 0);
-        modelGroup.add(horn);
-      });
-      const eyeSlit = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.08, 0.08), glowMaterial);
-      eyeSlit.position.set(0, 1.92, 0.3);
-      modelGroup.add(eyeSlit);
-    } else if (previewChar.modelStyle === 'valkyrie') {
-      [-1, 1].forEach((dir) => {
-        const wingGeo = new THREE.BoxGeometry(0.12, 1.05, 0.04);
-        wingGeo.rotateZ(dir * 0.45);
-        wingGeo.rotateY(dir * 0.2);
-        const wing = new THREE.Mesh(wingGeo, glowMaterial);
-        wing.position.set(dir * 0.45, 1.35, -0.28);
-        modelGroup.add(wing);
-      });
-    } else if (previewChar.modelStyle === 'shinobi') {
-      [-0.35, 0.35].forEach((angle, idx) => {
-        const scabbardGeo = new THREE.BoxGeometry(0.08, 1.15, 0.08);
-        scabbardGeo.rotateZ(angle);
-        const scabbard = new THREE.Mesh(scabbardGeo, armorMaterial);
-        scabbard.position.set(idx === 0 ? -0.1 : 0.1, 1.25, -0.32);
-        modelGroup.add(scabbard);
-      });
-      const mask = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.24, 0.1), suitMaterial);
-      mask.position.set(0, 1.76, 0.24);
-      modelGroup.add(mask);
-    } else if (previewChar.modelStyle === 'paladin') {
-      const haloGeo = new THREE.TorusGeometry(0.36, 0.038, 16, 28);
-      const halo = new THREE.Mesh(haloGeo, glowMaterial);
-      halo.position.set(0, 2.05, -0.15);
-      modelGroup.add(halo);
-
-      const capeGeo = new THREE.BoxGeometry(0.72, 1.15, 0.05);
-      capeGeo.rotateX(0.18);
-      const cape = new THREE.Mesh(capeGeo, accentMaterial);
-      cape.position.set(0, 0.95, -0.38);
-      modelGroup.add(cape);
-    }
-
-    // Arms
-    const armW = isTitan ? 0.32 : 0.24;
-    const armH = isTitan ? 0.85 : 0.75;
-    const armGeo = new THREE.BoxGeometry(armW, armH, armW);
-    armGeo.translate(0, -armH / 2, 0);
-
-    const leftArm = new THREE.Mesh(armGeo, suitMaterial);
-    leftArm.position.set(-(torsoW / 2 + armW / 2 + 0.04), 1.45, 0);
-    modelGroup.add(leftArm);
-
-    const rightArm = new THREE.Mesh(armGeo, suitMaterial);
-    rightArm.position.set(torsoW / 2 + armW / 2 + 0.04, 1.45, 0);
-    modelGroup.add(rightArm);
-
-    // Shoulders
-    if (isTitan) {
-      [-1, 1].forEach((dir) => {
-        const p = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), accentMaterial);
-        p.position.set(dir * (torsoW / 2 + armW / 2 + 0.04), 1.45, 0);
-        modelGroup.add(p);
-      });
-    }
-
-    // Legs
-    const legW = isTitan ? 0.34 : 0.28;
-    const legH = isTitan ? 0.8 : 0.75;
-    const legGeo = new THREE.BoxGeometry(legW, legH, legW);
-    legGeo.translate(0, -legH / 2, 0);
-
-    const leftLeg = new THREE.Mesh(legGeo, armorMaterial);
-    leftLeg.position.set(-0.25, 0.7, 0);
-    modelGroup.add(leftLeg);
-
-    const rightLeg = new THREE.Mesh(legGeo, armorMaterial);
-    rightLeg.position.set(0.25, 0.7, 0);
-    modelGroup.add(rightLeg);
+    // Build the 3D model with all 10 heroes and outfits
+    buildCharacterRig(modelGroup, previewCharId, previewOutfitId, true);
 
     // Platform ring underneath
     const platGeo = new THREE.CylinderGeometry(1.2, 1.3, 0.1, 24);
@@ -258,7 +124,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
         onBuyCharacter(char.id, char.price);
         soundManager.playPowerup();
       } else {
-        alert(`Tangalar yetarli emas! Sizda ${totalCoins} tanga bor, bu qahramon uchun esa ${char.price} tanga kerak.`);
+        soundManager.playHit();
       }
     }
   };
@@ -275,7 +141,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
         onBuyOutfit(outfit.id, outfit.price);
         soundManager.playPowerup();
       } else {
-        alert(`Tangalar yetarli emas! Sizda ${totalCoins} tanga bor, bu libos uchun esa ${outfit.price} tanga kerak.`);
+        soundManager.playHit();
       }
     }
   };
@@ -284,31 +150,31 @@ export const ShopModal: React.FC<ShopModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-800 bg-slate-900/90">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-lg">
               <ShoppingBag className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-white">Qahramonlar va Kiyimlar</h2>
-              <p className="text-xs text-slate-400">Yangi qahramonlar va maxsus liboslarni tangaga sotib oling</p>
+              <h2 className="text-lg sm:text-2xl font-black text-white">Qahramonlar ({CHARACTERS_CATALOG.length} ta)</h2>
+              <p className="text-[11px] sm:text-xs text-slate-400">Subway Surfers jamoasi va maxsus kiyimlar</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Coin Balance Badge */}
-            <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/40 px-3.5 py-1.5 rounded-2xl shadow-lg">
+            <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/40 px-3 py-1.5 rounded-2xl shadow-lg">
               <div className="w-5 h-5 rounded-full bg-amber-400 border border-amber-200 flex items-center justify-center text-xs font-black text-amber-950 shadow-sm">
                 ¢
               </div>
-              <span className="font-mono font-black text-amber-300 text-base sm:text-lg">
+              <span className="font-mono font-black text-amber-300 text-sm sm:text-lg">
                 {totalCoins.toLocaleString()}
               </span>
             </div>
 
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition"
+              className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -316,17 +182,17 @@ export const ShopModal: React.FC<ShopModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 px-6 py-2.5 border-b border-slate-800 bg-slate-950/40">
+        <div className="flex items-center gap-2 px-4 sm:px-6 py-2.5 border-b border-slate-800 bg-slate-950/40">
           <button
             onClick={() => setActiveTab('characters')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'characters'
                 ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/30'
                 : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
             }`}
           >
             <UserCheck className="w-4 h-4" />
-            <span>QAHRAMONLAR (5 ta Qahramon)</span>
+            <span>QAHRAMONLAR ({CHARACTERS_CATALOG.length} ta)</span>
           </button>
 
           <button

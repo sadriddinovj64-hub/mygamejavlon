@@ -40,7 +40,7 @@ export interface LevelConfig {
   biome: BiomeTheme;
 }
 
-export type PowerupType = 'none' | 'magnet' | 'shield' | 'boost';
+export type PowerupType = 'none' | 'magnet' | 'shield' | 'boost' | 'sneakers' | 'jetpack' | 'hoverboard' | '2x';
 
 export interface PlayerStats {
   score: number;

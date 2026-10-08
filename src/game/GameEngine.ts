@@ -3,6 +3,7 @@ import { BiomeTheme, LevelConfig, PlayerStats, PowerupType } from '../types/game
 import { CHARACTERS_CATALOG } from '../types/character';
 import { BIOMES, BIOME_KEYS } from '../utils/levelGenerator';
 import { soundManager } from '../utils/audio';
+import { buildCharacterRig } from './CharacterModelBuilder';
 
 export interface GameEngineCallbacks {
   onStatsUpdate: (stats: PlayerStats) => void;
@@ -51,6 +52,8 @@ export class GameEngine {
 
   // Player Physics & State
   private targetLaneIndex: number = 1; // 0, 1, 2
+  private previousLaneIndex: number = 1;
+  private isOnTrainRoof: boolean = false;
   private playerX: number = 0;
   private playerY: number = 0;
   private playerZ: number = 0;
@@ -75,10 +78,15 @@ export class GameEngine {
   private chaserStompTimer: number = 0;
   private chaserDurationTimer: number = 5.0;
   private chaserActive: boolean = true;
+  private isLobbyMode: boolean = false;
+  private lobbyAnimTime: number = 0;
+  private sprayPuffTimer: number = 0;
 
   // Active Powerups
   private activePowerup: PowerupType = 'none';
   private powerupTimer: number = 0;
+  private hoverboardMesh: THREE.Object3D | null = null;
+  private sprayCanMesh: THREE.Object3D | null = null;
 
   // Gameplay State
   private health: number = 3;
@@ -107,8 +115,12 @@ export class GameEngine {
     mesh: THREE.Object3D;
     lane: number;
     z: number;
-    type: 'low' | 'high' | 'block' | 'double_block' | 'moving';
+    type: 'low' | 'high' | 'block' | 'double_block' | 'moving' | 'train' | 'moving_train';
     movingDirection?: number;
+    speedZ?: number;
+    length?: number;
+    rampLength?: number;
+    hasRamp?: boolean;
     originalX?: number;
     hit: boolean;
     bbox: THREE.Box3;
@@ -116,7 +128,7 @@ export class GameEngine {
 
   private collectibles: {
     mesh: THREE.Object3D;
-    type: 'coin' | 'magnet' | 'shield' | 'boost' | 'heart';
+    type: 'coin' | 'magnet' | 'shield' | 'boost' | 'heart' | 'sneakers' | 'jetpack' | 'hoverboard' | '2x' | 'box';
     lane: number;
     z: number;
     y: number;
@@ -282,290 +294,76 @@ export class GameEngine {
     this.buildPlayerBodyMesh();
   }
 
+  public setLobbyMode(isLobby: boolean) {
+    this.isLobbyMode = isLobby;
+    if (isLobby) {
+      this.playerX = 0;
+      this.playerY = 0;
+      this.playerBodyGroup.scale.set(0.85, 0.85, 0.85);
+      this.playerGroup.position.set(0, 0, this.playerZ);
+      this.playerGroup.rotation.y = Math.PI - 0.2;
+      this.camera.position.set(0, 1.45, this.playerZ - 3.4);
+      this.camera.lookAt(0, 1.15, this.playerZ);
+      if (this.chaserGroup) {
+        this.chaserGroup.visible = false;
+      }
+    } else {
+      // Subway Surfers Gameplay Proportions: Character is ~half the height of a train!
+      this.playerBodyGroup.scale.set(0.6, 0.6, 0.6);
+      this.playerGroup.rotation.y = 0;
+      this.camera.position.set(0, 6.2, this.playerZ - 9.2);
+      this.camera.lookAt(0, 1.0, this.playerZ + 14);
+      if (this.chaserGroup) {
+        this.chaserGroup.visible = true;
+      }
+      this.alertPoliceChaser();
+    }
+  }
+
   private buildPlayerBodyMesh() {
-    // Clear existing body children
-    while (this.playerBodyGroup.children.length > 0) {
-      this.playerBodyGroup.remove(this.playerBodyGroup.children[0]);
+    const rig = buildCharacterRig(
+      this.playerBodyGroup,
+      this.characterId,
+      this.outfitId,
+      this.quality === 'high'
+    );
+    this.leftArmGroup = rig.leftArmGroup;
+    this.rightArmGroup = rig.rightArmGroup;
+    this.leftLegGroup = rig.leftLegGroup;
+    this.rightLegGroup = rig.rightLegGroup;
+    this.torsoMesh = rig.torsoMesh;
+    this.headMesh = rig.headMesh;
+    this.hoverboardMesh = rig.hoverboardMesh || null;
+    this.sprayCanMesh = rig.sprayCanInHand || null;
+
+    const s = this.isLobbyMode ? 0.85 : 0.6;
+    this.playerBodyGroup.scale.set(s, s, s);
+
+    if (this.hoverboardMesh) {
+      this.hoverboardMesh.visible = this.activePowerup === 'hoverboard';
     }
-
-    const charData = CHARACTERS_CATALOG.find((c) => c.id === this.characterId) || CHARACTERS_CATALOG[0];
-    const outfit = charData.outfits.find((o) => o.id === this.outfitId) || charData.outfits[0];
-
-    // Outfit Materials
-    const suitMaterial = new THREE.MeshStandardMaterial({
-      color: outfit.suitColor,
-      roughness: 0.28,
-      metalness: 0.35,
-    });
-
-    const armorMaterial = new THREE.MeshStandardMaterial({
-      color: outfit.armorColor,
-      roughness: 0.35,
-      metalness: 0.5,
-    });
-
-    const accentMaterial = new THREE.MeshStandardMaterial({
-      color: outfit.accentColor,
-      roughness: 0.25,
-      metalness: 0.4,
-    });
-
-    const glowMaterial = new THREE.MeshBasicMaterial({
-      color: outfit.glowColor,
-    });
-
-    // 1. Torso (Body)
-    const isTitan = charData.modelStyle === 'titan';
-    const isValkyrie = charData.modelStyle === 'valkyrie';
-    const torsoW = isTitan ? 1.05 : isValkyrie ? 0.72 : 0.8;
-    const torsoH = isTitan ? 1.02 : isValkyrie ? 0.92 : 0.95;
-    const torsoD = isTitan ? 0.62 : isValkyrie ? 0.46 : 0.5;
-
-    const torsoGeo = new THREE.BoxGeometry(torsoW, torsoH, torsoD);
-    this.torsoMesh = new THREE.Mesh(torsoGeo, suitMaterial);
-    this.torsoMesh.position.y = 1.1;
-    this.torsoMesh.castShadow = this.quality === 'high';
-    this.playerBodyGroup.add(this.torsoMesh);
-
-    // Chest Reactor / Emblem
-    const coreGeo = new THREE.CylinderGeometry(isTitan ? 0.2 : 0.14, isTitan ? 0.2 : 0.14, 0.08, 16);
-    coreGeo.rotateX(Math.PI / 2);
-    const coreMesh = new THREE.Mesh(coreGeo, glowMaterial);
-    coreMesh.position.set(0, 1.2, torsoD / 2 + 0.02);
-    this.playerBodyGroup.add(coreMesh);
-
-    // Front Chest Armor Plate
-    if (isTitan || charData.modelStyle === 'paladin') {
-      const plateGeo = new THREE.BoxGeometry(torsoW * 0.85, torsoH * 0.6, 0.12);
-      const plateMesh = new THREE.Mesh(plateGeo, armorMaterial);
-      plateMesh.position.set(0, 1.15, torsoD / 2 + 0.06);
-      this.playerBodyGroup.add(plateMesh);
+    if (this.sprayCanMesh) {
+      this.sprayCanMesh.visible = this.isLobbyMode;
     }
-
-    // 2. Character Specific Back Accessories
-    if (charData.modelStyle === 'bolt') {
-      // Aerodynamic thruster pack with dual nozzles
-      const packGeo = new THREE.BoxGeometry(0.5, 0.58, 0.26);
-      const packMesh = new THREE.Mesh(packGeo, armorMaterial);
-      packMesh.position.set(0, 1.15, -0.34);
-      this.playerBodyGroup.add(packMesh);
-
-      [-0.15, 0.15].forEach((nx) => {
-        const nGeo = new THREE.CylinderGeometry(0.08, 0.06, 0.18, 12);
-        nGeo.rotateX(Math.PI / 2);
-        const nMesh = new THREE.Mesh(nGeo, glowMaterial);
-        nMesh.position.set(nx, 0.96, -0.42);
-        this.playerBodyGroup.add(nMesh);
-      });
-    } else if (charData.modelStyle === 'valkyrie') {
-      // Dual Radiant Energy Wings
-      [-1, 1].forEach((dir) => {
-        const wingGeo = new THREE.BoxGeometry(0.12, 1.05, 0.04);
-        wingGeo.rotateZ(dir * 0.45);
-        wingGeo.rotateY(dir * 0.2);
-        const wingMesh = new THREE.Mesh(wingGeo, glowMaterial);
-        wingMesh.position.set(dir * 0.45, 1.35, -0.28);
-        this.playerBodyGroup.add(wingMesh);
-      });
-    } else if (charData.modelStyle === 'shinobi') {
-      // Crossed Dual Katanas on Back
-      [-0.35, 0.35].forEach((angle, idx) => {
-        const scabbardGeo = new THREE.BoxGeometry(0.08, 1.15, 0.08);
-        scabbardGeo.rotateZ(angle);
-        const scabbardMesh = new THREE.Mesh(scabbardGeo, armorMaterial);
-        scabbardMesh.position.set(idx === 0 ? -0.1 : 0.1, 1.25, -0.32);
-        this.playerBodyGroup.add(scabbardMesh);
-
-        // Hilt
-        const hiltGeo = new THREE.BoxGeometry(0.06, 0.25, 0.06);
-        hiltGeo.rotateZ(angle);
-        const hiltMesh = new THREE.Mesh(hiltGeo, accentMaterial);
-        hiltMesh.position.set(idx === 0 ? -0.25 : 0.25, 1.78, -0.34);
-        this.playerBodyGroup.add(hiltMesh);
-      });
-    } else if (charData.modelStyle === 'paladin') {
-      // Royal Flowing Cape
-      const capeGeo = new THREE.BoxGeometry(0.72, 1.15, 0.05);
-      capeGeo.rotateX(0.18);
-      const capeMesh = new THREE.Mesh(capeGeo, accentMaterial);
-      capeMesh.position.set(0, 0.95, -0.38);
-      this.playerBodyGroup.add(capeMesh);
-    } else if (charData.modelStyle === 'titan') {
-      // Heavy Power Generator
-      const genGeo = new THREE.BoxGeometry(0.75, 0.75, 0.35);
-      const genMesh = new THREE.Mesh(genGeo, armorMaterial);
-      genMesh.position.set(0, 1.15, -0.42);
-      this.playerBodyGroup.add(genMesh);
-    }
-
-    // 3. Head & Unique Headgear
-    const headSize = isTitan ? 0.62 : 0.52;
-    const headGeo = new THREE.BoxGeometry(headSize, headSize, headSize);
-    this.headMesh = new THREE.Mesh(headGeo, armorMaterial);
-    this.headMesh.position.y = isTitan ? 1.9 : 1.85;
-    this.headMesh.castShadow = this.quality === 'high';
-    this.playerBodyGroup.add(this.headMesh);
-
-    if (charData.modelStyle === 'bolt') {
-      // Sleek Cyber Visor
-      const visorGeo = new THREE.BoxGeometry(0.48, 0.16, 0.1);
-      const visorMesh = new THREE.Mesh(visorGeo, glowMaterial);
-      visorMesh.position.set(0, 1.88, 0.24);
-      this.playerBodyGroup.add(visorMesh);
-    } else if (charData.modelStyle === 'titan') {
-      // Heavy Horned Helm + Slit Visor
-      [-0.32, 0.32].forEach((hx) => {
-        const hornGeo = new THREE.ConeGeometry(0.1, 0.35, 6);
-        hornGeo.rotateZ(hx < 0 ? -0.45 : 0.45);
-        const horn = new THREE.Mesh(hornGeo, accentMaterial);
-        horn.position.set(hx, 2.25, 0);
-        this.playerBodyGroup.add(horn);
-      });
-
-      const eyeSlitGeo = new THREE.BoxGeometry(0.44, 0.08, 0.08);
-      const eyeSlit = new THREE.Mesh(eyeSlitGeo, glowMaterial);
-      eyeSlit.position.set(0, 1.92, 0.3);
-      this.playerBodyGroup.add(eyeSlit);
-    } else if (charData.modelStyle === 'valkyrie') {
-      // Winged Ear Crests + Star Visor
-      [-0.3, 0.3].forEach((wx) => {
-        const finGeo = new THREE.BoxGeometry(0.06, 0.35, 0.25);
-        finGeo.rotateZ(wx < 0 ? -0.3 : 0.3);
-        const fin = new THREE.Mesh(finGeo, accentMaterial);
-        fin.position.set(wx, 1.98, 0.05);
-        this.playerBodyGroup.add(fin);
-      });
-
-      const vGeo = new THREE.BoxGeometry(0.44, 0.14, 0.08);
-      const vMesh = new THREE.Mesh(vGeo, glowMaterial);
-      vMesh.position.set(0, 1.88, 0.24);
-      this.playerBodyGroup.add(vMesh);
-    } else if (charData.modelStyle === 'shinobi') {
-      // Ninja Face Mask + Forehead Plate + Ribbons
-      const maskGeo = new THREE.BoxGeometry(0.5, 0.24, 0.1);
-      const maskMesh = new THREE.Mesh(maskGeo, suitMaterial);
-      maskMesh.position.set(0, 1.76, 0.24);
-      this.playerBodyGroup.add(maskMesh);
-
-      const plateGeo = new THREE.BoxGeometry(0.42, 0.12, 0.06);
-      const plateMesh = new THREE.Mesh(plateGeo, accentMaterial);
-      plateMesh.position.set(0, 1.98, 0.25);
-      this.playerBodyGroup.add(plateMesh);
-
-      // Fluttering Ribbon Tails behind head
-      [-0.1, 0.1].forEach((rx) => {
-        const ribbonGeo = new THREE.BoxGeometry(0.08, 0.55, 0.03);
-        ribbonGeo.rotateX(0.28);
-        const ribbonMesh = new THREE.Mesh(ribbonGeo, accentMaterial);
-        ribbonMesh.position.set(rx, 1.7, -0.38);
-        this.playerBodyGroup.add(ribbonMesh);
-      });
-    } else if (charData.modelStyle === 'paladin') {
-      // Floating Golden Solar Halo Crown
-      const haloGeo = new THREE.TorusGeometry(0.36, 0.038, 16, 28);
-      const haloMesh = new THREE.Mesh(haloGeo, glowMaterial);
-      haloMesh.position.set(0, 2.05, -0.15);
-      this.playerBodyGroup.add(haloMesh);
-
-      const knightVisorGeo = new THREE.BoxGeometry(0.44, 0.14, 0.1);
-      const knightVisor = new THREE.Mesh(knightVisorGeo, accentMaterial);
-      knightVisor.position.set(0, 1.88, 0.24);
-      this.playerBodyGroup.add(knightVisor);
-    }
-
-    // 4. Arms & Pauldrons
-    const armW = isTitan ? 0.32 : 0.24;
-    const armH = isTitan ? 0.85 : 0.75;
-    const armD = isTitan ? 0.32 : 0.24;
-    const armGeo = new THREE.BoxGeometry(armW, armH, armD);
-    armGeo.translate(0, -armH / 2, 0);
-
-    // Left Arm
-    this.leftArmGroup = new THREE.Group();
-    this.leftArmGroup.position.set(-(torsoW / 2 + armW / 2 + 0.04), 1.45, 0);
-    const leftArmMesh = new THREE.Mesh(armGeo, suitMaterial);
-    leftArmMesh.castShadow = this.quality === 'high';
-    this.leftArmGroup.add(leftArmMesh);
-
-    // Right Arm
-    this.rightArmGroup = new THREE.Group();
-    this.rightArmGroup.position.set(torsoW / 2 + armW / 2 + 0.04, 1.45, 0);
-    const rightArmMesh = new THREE.Mesh(armGeo, suitMaterial);
-    rightArmMesh.castShadow = this.quality === 'high';
-    this.rightArmGroup.add(rightArmMesh);
-
-    // Shoulder Armor Pauldrons
-    if (isTitan) {
-      [-1, 1].forEach((side) => {
-        const pGeo = new THREE.BoxGeometry(0.52, 0.42, 0.52);
-        const pMesh = new THREE.Mesh(pGeo, accentMaterial);
-        pMesh.position.set(0, -0.05, 0);
-        if (side === -1) this.leftArmGroup.add(pMesh);
-        else this.rightArmGroup.add(pMesh);
-      });
-    } else if (charData.modelStyle === 'paladin') {
-      [-1, 1].forEach((side) => {
-        const pGeo = new THREE.SphereGeometry(0.24, 8, 8);
-        const pMesh = new THREE.Mesh(pGeo, accentMaterial);
-        pMesh.position.set(0, -0.05, 0);
-        if (side === -1) this.leftArmGroup.add(pMesh);
-        else this.rightArmGroup.add(pMesh);
-      });
-    }
-
-    this.playerBodyGroup.add(this.leftArmGroup);
-    this.playerBodyGroup.add(this.rightArmGroup);
-
-    // 5. Legs & Boots
-    const legW = isTitan ? 0.34 : 0.28;
-    const legH = isTitan ? 0.8 : 0.75;
-    const legD = isTitan ? 0.34 : 0.28;
-    const legGeo = new THREE.BoxGeometry(legW, legH, legD);
-    legGeo.translate(0, -legH / 2, 0);
-
-    // Left Leg
-    this.leftLegGroup = new THREE.Group();
-    this.leftLegGroup.position.set(-0.25, 0.7, 0);
-    const leftLegMesh = new THREE.Mesh(legGeo, armorMaterial);
-    leftLegMesh.castShadow = this.quality === 'high';
-    this.leftLegGroup.add(leftLegMesh);
-
-    const shoeGeo = new THREE.BoxGeometry(legW + 0.05, 0.18, 0.44);
-    const leftShoe = new THREE.Mesh(shoeGeo, glowMaterial);
-    leftShoe.position.set(0, -legH + 0.05, 0.08);
-    this.leftLegGroup.add(leftShoe);
-
-    // Right Leg
-    this.rightLegGroup = new THREE.Group();
-    this.rightLegGroup.position.set(0.25, 0.7, 0);
-    const rightLegMesh = new THREE.Mesh(legGeo, armorMaterial);
-    rightLegMesh.castShadow = this.quality === 'high';
-    this.rightLegGroup.add(rightLegMesh);
-
-    const rightShoe = new THREE.Mesh(shoeGeo, glowMaterial);
-    rightShoe.position.set(0, -legH + 0.05, 0.08);
-    this.rightLegGroup.add(rightShoe);
-
-    this.playerBodyGroup.add(this.leftLegGroup);
-    this.playerBodyGroup.add(this.rightLegGroup);
   }
 
   // --- Pursuer / Chaser Creation (Police Officer / Politsiyachi) ---
   private createChaser() {
     this.chaserGroup = new THREE.Group();
     this.chaserBodyGroup = new THREE.Group();
+    this.chaserBodyGroup.scale.set(0.62, 0.62, 0.62);
     this.chaserGroup.add(this.chaserBodyGroup);
 
-    // Uniform & Character Materials matching the user's reference image
+    // Uniform & Character Materials matching Subway Surfers Inspector
     const policeShirtMat = new THREE.MeshStandardMaterial({
-      color: 0x1d3557, // Rich navy blue uniform shirt
-      roughness: 0.55,
+      color: 0x365314, // Classic Subway Surfers Olive Green uniform
+      roughness: 0.6,
       metalness: 0.1,
     });
 
     const policePantsMat = new THREE.MeshStandardMaterial({
-      color: 0x141f36, // Deep navy blue trousers
-      roughness: 0.65,
+      color: 0x27272a, // Dark grey trousers
+      roughness: 0.7,
       metalness: 0.05,
     });
 
@@ -582,7 +380,7 @@ export class GameEngine {
     });
 
     const capCrownMat = new THREE.MeshStandardMaterial({
-      color: 0x1b305b, // Police cap crown
+      color: 0x365314, // Olive green peaked cap
       roughness: 0.5,
     });
 
@@ -823,6 +621,43 @@ export class GameEngine {
     this.chaserDurationTimer = 5.0;
     this.chaserActive = true;
     this.chaserGroup.position.set(0, 0, -3.6);
+
+    // The Inspector's Bulldog running alongside
+    const dogGroup = new THREE.Group();
+    dogGroup.position.set(-0.8, 0, 0.2);
+
+    const dogBodyGeo = new THREE.BoxGeometry(0.38, 0.35, 0.65);
+    const dogBodyMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 }); // Brown fur
+    const dogBody = new THREE.Mesh(dogBodyGeo, dogBodyMat);
+    dogBody.position.y = 0.32;
+    dogGroup.add(dogBody);
+
+    // Dog Head & Snout
+    const dogHeadGeo = new THREE.BoxGeometry(0.32, 0.32, 0.35);
+    const dogHead = new THREE.Mesh(dogHeadGeo, dogBodyMat);
+    dogHead.position.set(0, 0.45, 0.38);
+    dogGroup.add(dogHead);
+
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.18), new THREE.MeshStandardMaterial({ color: 0xfef3c7 }));
+    snout.position.set(0, 0.38, 0.54);
+    dogGroup.add(snout);
+
+    // Red Collar
+    const collar = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.08, 0.36), new THREE.MeshBasicMaterial({ color: 0xdc2626 }));
+    collar.position.set(0, 0.42, 0.22);
+    dogGroup.add(collar);
+
+    // 4 Pumping Legs
+    [-0.14, 0.14].forEach((lx) => {
+      [-0.2, 0.2].forEach((lz) => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.25, 0.1), dogBodyMat);
+        leg.position.set(lx, 0.12, lz);
+        dogGroup.add(leg);
+      });
+    });
+
+    this.chaserBodyGroup.add(dogGroup);
+
     this.scene.add(this.chaserGroup);
   }
 
@@ -918,13 +753,13 @@ export class GameEngine {
     const group = new THREE.Group();
     group.position.z = startZ;
 
-    // Road surface
+    // 1. Ballast Railway Track Bed (Cobblestone & Gravel)
     const roadWidth = 9.2;
     const roadGeo = new THREE.PlaneGeometry(roadWidth, SEGMENT_LENGTH);
     roadGeo.rotateX(-Math.PI / 2);
     const roadMat = new THREE.MeshStandardMaterial({
-      color: theme.roadColor,
-      roughness: 0.5,
+      color: 0x6e4324, // Warm railway ballast gravel/stone
+      roughness: 0.85,
       metalness: 0.1,
     });
     const roadMesh = new THREE.Mesh(roadGeo, roadMat);
@@ -932,7 +767,7 @@ export class GameEngine {
     roadMesh.receiveShadow = this.quality !== 'low';
     group.add(roadMesh);
 
-    // Ground landscape outside road
+    // Ground landscape outside tracks
     const groundWidth = 70;
     const groundGeo = new THREE.PlaneGeometry(groundWidth, SEGMENT_LENGTH);
     groundGeo.rotateX(-Math.PI / 2);
@@ -950,20 +785,109 @@ export class GameEngine {
     groundRight.receiveShadow = this.quality !== 'low';
     group.add(groundRight);
 
-    // Glowing Lane Dividers
-    const laneMarkerGeo = new THREE.PlaneGeometry(0.18, SEGMENT_LENGTH);
-    laneMarkerGeo.rotateX(-Math.PI / 2);
-    const laneMarkerMat = new THREE.MeshBasicMaterial({
-      color: theme.laneColor,
+    // 2. Wooden Sleepers (Shpal / Railroad Ties) under all 3 tracks
+    const sleeperGeo = new THREE.BoxGeometry(2.1, 0.08, 0.42);
+    const sleeperMat = new THREE.MeshStandardMaterial({
+      color: 0x451a03, // Dark aged railway wood
+      roughness: 0.9,
     });
 
-    const leftDivider = new THREE.Mesh(laneMarkerGeo, laneMarkerMat);
-    leftDivider.position.set(-1.3, 0.01, SEGMENT_LENGTH / 2);
-    group.add(leftDivider);
+    const sleeperSpacing = 1.8;
+    const sleeperCount = Math.floor(SEGMENT_LENGTH / sleeperSpacing);
+    for (let s = 0; s < sleeperCount; s++) {
+      const sZ = s * sleeperSpacing + 0.9;
+      LANES.forEach((laneX) => {
+        const sleeper = new THREE.Mesh(sleeperGeo, sleeperMat);
+        sleeper.position.set(laneX, 0.04, sZ);
+        sleeper.receiveShadow = this.quality !== 'low';
+        group.add(sleeper);
+      });
+    }
 
-    const rightDivider = new THREE.Mesh(laneMarkerGeo, laneMarkerMat);
-    rightDivider.position.set(1.3, 0.01, SEGMENT_LENGTH / 2);
-    group.add(rightDivider);
+    // 3. Shiny Metallic Steel Rails (2 parallel rails per track = 6 steel rails total!)
+    const railGeo = new THREE.BoxGeometry(0.12, 0.15, SEGMENT_LENGTH);
+    const railMat = new THREE.MeshStandardMaterial({
+      color: 0xd4d4d8, // Polished shiny steel
+      metalness: 0.92,
+      roughness: 0.22,
+    });
+
+    LANES.forEach((laneX) => {
+      [-0.72, 0.72].forEach((offset) => {
+        const rail = new THREE.Mesh(railGeo, railMat);
+        rail.position.set(laneX + offset, 0.14, SEGMENT_LENGTH / 2);
+        rail.castShadow = this.quality === 'high';
+        group.add(rail);
+      });
+    });
+
+    // 4. Overhead Railway Gantry Arch & Power Lines (High at y = 13.5 so player head never touches on jump!)
+    const gantryGroup = new THREE.Group();
+    gantryGroup.position.set(0, 0, SEGMENT_LENGTH / 2);
+
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x15803d, metalness: 0.6, roughness: 0.4 });
+    const pillarGeo = new THREE.BoxGeometry(0.28, 13.5, 0.28);
+
+    // Left and Right Gantry Towers
+    const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
+    leftPillar.position.set(-4.6, 6.75, 0);
+    gantryGroup.add(leftPillar);
+
+    const rightPillar = new THREE.Mesh(pillarGeo, pillarMat);
+    rightPillar.position.set(4.6, 6.75, 0);
+    gantryGroup.add(rightPillar);
+
+    // Top Overhead Crossbeam (High at y = 13.5)
+    const beamGeo = new THREE.BoxGeometry(9.5, 0.3, 0.26);
+    const beam = new THREE.Mesh(beamGeo, pillarMat);
+    beam.position.set(0, 13.5, 0);
+    gantryGroup.add(beam);
+
+    // Hanging Power Line Insulators over each lane
+    LANES.forEach((lx) => {
+      const insGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.35, 8);
+      const insMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
+      const ins = new THREE.Mesh(insGeo, insMat);
+      ins.position.set(lx, 13.15, 0);
+      gantryGroup.add(ins);
+    });
+
+    group.add(gantryGroup);
+
+    // 3 Overhead Power Cables along the segment (High at y = 12.95)
+    LANES.forEach((lx) => {
+      const cableGeo = new THREE.BoxGeometry(0.025, 0.025, SEGMENT_LENGTH);
+      const cableMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+      const cable = new THREE.Mesh(cableGeo, cableMat);
+      cable.position.set(lx, 12.95, SEGMENT_LENGTH / 2);
+      group.add(cable);
+    });
+
+    // 5. Candy-Cane Striped Railway Crossing Signal Post (Subway Surfers Svetofori)
+    const signalGroup = new THREE.Group();
+    signalGroup.position.set(4.75, 0, SEGMENT_LENGTH * 0.7);
+
+    // Red and White striped pole
+    for (let b = 0; b < 6; b++) {
+      const bandGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.45, 8);
+      const bandMat = new THREE.MeshBasicMaterial({ color: b % 2 === 0 ? 0xdc2626 : 0xffffff });
+      const band = new THREE.Mesh(bandGeo, bandMat);
+      band.position.y = 0.25 + b * 0.45;
+      signalGroup.add(band);
+    }
+
+    // Top Signal Box with Glowing Red Lamp
+    const boxGeo = new THREE.BoxGeometry(0.35, 0.55, 0.25);
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+    const sBox = new THREE.Mesh(boxGeo, boxMat);
+    sBox.position.y = 2.95;
+    signalGroup.add(sBox);
+
+    const redLight = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+    redLight.position.set(0, 3.05, -0.12);
+    signalGroup.add(redLight);
+
+    group.add(signalGroup);
 
     // Curbs & Rails
     const curbGeo = new THREE.BoxGeometry(0.35, 0.35, SEGMENT_LENGTH);
@@ -999,24 +923,158 @@ export class GameEngine {
     });
   }
 
-  // --- Dynamic Biome Scenery Generator ---
+  // --- Dynamic Subway Surfers City Scenery Generator ---
   private createSceneryForSegment(theme: BiomeTheme, length: number): THREE.Object3D[] {
     const list: THREE.Object3D[] = [];
-    const count = this.quality === 'low' ? 3 : 5;
 
-    for (let i = 0; i < count; i++) {
-      const zOffset = (i / count) * length + (Math.random() * 4 - 2);
+    // 1. Colorful Subway Surfers City Buildings along both sides
+    const buildingColors = [0xc2410c, 0xd97706, 0x991b1b, 0x0284c7, 0xea580c, 0x059669, 0x7c3aed];
+    const buildingPositionsZ = [8, 28];
 
-      // Left & Right side scenery
-      [-1, 1].forEach(side => {
-        const xOffset = side * (6.5 + Math.random() * 12);
-        const sceneryItem = this.createBiomeProp(theme.sceneryType, theme);
-        sceneryItem.position.set(xOffset, 0, zOffset);
-        list.push(sceneryItem);
+    [-1, 1].forEach((side) => {
+      buildingPositionsZ.forEach((zPos, idx) => {
+        const color = buildingColors[Math.floor(Math.random() * buildingColors.length)];
+        const building = this.createSubwayCityBuilding(side, color);
+        building.position.set(side * 9.5, 0, zPos);
+        list.push(building);
       });
+
+      // Park trees and street lamps between the buildings
+      const treeZ = 18;
+      const tree = this.createBiomeProp('forest', theme);
+      tree.position.set(side * 6.8, 0, treeZ);
+      list.push(tree);
+
+      const lampZ = 34;
+      const lamp = this.createBiomeProp('city', theme);
+      lamp.position.set(side * 6.8, 0, lampZ);
+      list.push(lamp);
+    });
+
+    // 2. Periodic Red Brick Railway Arch Bridge crossing all 3 tracks
+    if (Math.random() < 0.45) {
+      const arch = this.createSubwayBrickArch();
+      arch.position.set(0, 0, length * 0.5);
+      list.push(arch);
     }
 
     return list;
+  }
+
+  // Authentic Subway Surfers Townhouse City Building with NYC Water Tower & Iron Fire Escapes
+  private createSubwayCityBuilding(side: number, color: number): THREE.Object3D {
+    const group = new THREE.Group();
+    const bW = 6.8;
+    const bH = 10.5;
+    const bD = 6.2;
+
+    // Main Facade Block
+    const facadeGeo = new THREE.BoxGeometry(bW, bH, bD);
+    const facadeMat = new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.65,
+    });
+    const facade = new THREE.Mesh(facadeGeo, facadeMat);
+    facade.position.y = bH / 2;
+    facade.castShadow = this.quality === 'high';
+    facade.receiveShadow = this.quality !== 'low';
+    group.add(facade);
+
+    // Classic Stone Roof Cornice Ledge
+    const cornice = new THREE.Mesh(
+      new THREE.BoxGeometry(bW + 0.4, 0.5, bD + 0.4),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 })
+    );
+    cornice.position.y = bH + 0.25;
+    group.add(cornice);
+
+    // Iconic Subway Surfers NYC Wooden Rooftop Water Tower!
+    const towerGroup = new THREE.Group();
+    towerGroup.position.set(-side * 1.2, bH + 0.5, 0);
+    const barrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.05, 1.05, 1.8, 12),
+      new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 })
+    );
+    barrel.position.y = 1.4;
+    towerGroup.add(barrel);
+
+    const coneRoof = new THREE.Mesh(
+      new THREE.ConeGeometry(1.2, 0.9, 12),
+      new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6 })
+    );
+    coneRoof.position.y = 2.75;
+    towerGroup.add(coneRoof);
+    group.add(towerGroup);
+
+    // Iron Fire Escape Balconies & Slanted Ladder on Street Face
+    const ironMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.4 });
+    [3.8, 7.0].forEach((fy) => {
+      const balcony = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.12, 3.8), ironMat);
+      balcony.position.set(-side * (bW / 2 + 0.32), fy, 0);
+      group.add(balcony);
+
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.65, 3.8), ironMat);
+      rail.position.set(-side * (bW / 2 + 0.62), fy + 0.35, 0);
+      group.add(rail);
+    });
+
+    const ladder = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.8, 0.45), ironMat);
+    ladder.position.set(-side * (bW / 2 + 0.45), 5.4, 0.4);
+    ladder.rotation.x = 0.42;
+    group.add(ladder);
+
+    // 6 Windows with White Borders & Dark Glass
+    const windowFrameMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.8 });
+
+    [-1.8, 0, 1.8].forEach((wZ) => {
+      [4.4, 7.6].forEach((wY) => {
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.7, 1.15), windowFrameMat);
+        frame.position.set(-side * (bW / 2 + 0.04), wY, wZ);
+        group.add(frame);
+
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.45, 0.92), glassMat);
+        glass.position.set(-side * (bW / 2 + 0.05), wY, wZ);
+        group.add(glass);
+      });
+    });
+
+    // Ground Floor Striped Shop Awning
+    const awningGeo = new THREE.BoxGeometry(0.95, 0.22, 4.4);
+    const awningMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.4 });
+    const awning = new THREE.Mesh(awningGeo, awningMat);
+    awning.position.set(-side * (bW / 2 + 0.45), 2.5, 0);
+    awning.rotation.z = side * 0.32;
+    group.add(awning);
+
+    return group;
+  }
+
+  // Classic Subway Surfers Red-Brick Railway Arch Bridge (High at y = 14.0m so head never touches!)
+  private createSubwayBrickArch(): THREE.Object3D {
+    const archGroup = new THREE.Group();
+    const brickMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.85 });
+
+    // Left and Right Arch Pillars (Height 14.0m)
+    [-5.6, 5.6].forEach((px) => {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.8, 14.0, 2.8), brickMat);
+      pillar.position.set(px, 7.0, 0);
+      archGroup.add(pillar);
+    });
+
+    // Top Overhead Bridge Beam spanning tracks at y = 14.2m
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(13.0, 1.6, 3.2), brickMat);
+    bridge.position.set(0, 14.2, 0);
+    archGroup.add(bridge);
+
+    // Arch Banner Sign
+    const signGeo = new THREE.BoxGeometry(6.2, 0.9, 0.1);
+    const signMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const sign = new THREE.Mesh(signGeo, signMat);
+    sign.position.set(0, 14.2, -1.65);
+    archGroup.add(sign);
+
+    return archGroup;
   }
 
   private createBiomeProp(type: string, theme: BiomeTheme): THREE.Object3D {
@@ -1164,48 +1222,246 @@ export class GameEngine {
     return propGroup;
   }
 
-  // --- Obstacle & Collectible Spawning ---
+  // --- Obstacle & Collectible Spawning (Subway Surfers Style) ---
   private populateSegment(startZ: number) {
     // Don't spawn obstacles right next to the finish portal
     if (startZ > this.finishZ - 45) return;
 
-    const density = this.levelConfig.obstacleDensity;
-    const numPatterns = Math.floor(1 + Math.random() * (1.8 * density));
+    // Number of patterns per 48m segment: 2 well-spaced patterns (24m gap between them)
+    const numPatterns = 2;
 
     for (let i = 0; i < numPatterns; i++) {
-      const zPos = startZ + 8 + (i * 14) + Math.random() * 4;
+      const zPos = startZ + 12 + i * 23;
       if (zPos > this.finishZ - 30) continue;
 
       const rand = Math.random();
 
-      if (rand < 0.28 && this.levelConfig.highLowBarrierChance > 0) {
-        // High barrier (must slide under)
-        const lane = Math.floor(Math.random() * 3);
-        this.spawnHighBarrier(lane, zPos);
-      } else if (rand < 0.58) {
-        // Low barrier (must jump)
-        const lane = Math.floor(Math.random() * 3);
-        this.spawnLowBarrier(lane, zPos);
-      } else if (rand < 0.85) {
-        // Block obstacle (must change lane)
-        const lane = Math.floor(Math.random() * 3);
-        this.spawnBlockObstacle(lane, zPos);
-      } else if (this.levelConfig.movingObstacleChance > 0.1 && Math.random() < this.levelConfig.movingObstacleChance) {
-        // Moving hazard drone
-        this.spawnMovingDrone(zPos);
+      // Subway Surfers Rule: ALWAYS guarantee at least 1 open lane AND clear ramped vs ramp-less trains (like Image 1)!
+      if (startZ >= 48 && rand < 0.44) {
+        // Pattern 1: Climbable Train with Front Ramp + Adjacent Ramp-less Train + 100% Open Lane!
+        const rampTrainLane = Math.floor(Math.random() * 3);
+        const noRampTrainLane = (rampTrainLane + 1) % 3;
+        const openLane = (rampTrainLane + 2) % 3;
+
+        // Train WITH Front Ramp (Player CAN climb from front!)
+        this.spawnTrain(rampTrainLane, zPos, false, true);
+
+        // Train WITHOUT Ramp (Player CANNOT climb from ground — only reachable by jumping across from the ramped train's roof!)
+        this.spawnTrain(noRampTrainLane, zPos + 2.5, false, false);
+        for (let c = 0; c < 4; c++) {
+          this.spawnCoin(noRampTrainLane, zPos - 2.0 + c * 2.2, 3.05);
+        }
+
+        // Spawn line of coins through the 100% open ground lane!
+        this.spawnCollectiblesNear(zPos + 4, openLane);
+      } else if (startZ >= 96 && rand < 0.62) {
+        // Pattern 2: Train with Ramp + Low Hurdle in 2nd lane + Open 3rd lane
+        const trainLane = Math.floor(Math.random() * 3);
+        this.spawnTrain(trainLane, zPos, false, true);
+
+        const hurdleLane = (trainLane + 1) % 3;
+        const openLane = (trainLane + 2) % 3;
+        this.spawnLowBarrier(hurdleLane, zPos);
+        this.spawnCollectiblesNear(zPos + 4, openLane);
+      } else if (rand < 0.75) {
+        // Pattern 3: Low Hurdle Barricade (MUST JUMP: 'W / Tepa')
+        const hurdleLane = Math.floor(Math.random() * 3);
+        this.spawnLowBarrier(hurdleLane, zPos);
+        // Other 2 lanes are open
+        const openLane = (hurdleLane + 1) % 3;
+        this.spawnCollectiblesNear(zPos + 4, openLane);
+      } else if (rand < 0.90) {
+        // Pattern 4: High Clearance Barrier (MUST SLIDE: 'S / Past')
+        const highLane = Math.floor(Math.random() * 3);
+        this.spawnHighBarrier(highLane, zPos);
+        // Other 2 lanes are open
+        const openLane = (highLane + 1) % 3;
+        this.spawnCollectiblesNear(zPos + 4, openLane);
       } else {
-        // Double block (only 1 free lane)
-        const freeLane = Math.floor(Math.random() * 3);
-        for (let l = 0; l < 3; l++) {
-          if (l !== freeLane) {
-            this.spawnBlockObstacle(l, zPos);
-          }
+        // Pattern 5: Oncoming Train rushing down track!
+        const trainLane = Math.floor(Math.random() * 3);
+        this.spawnTrain(trainLane, zPos + 10, true, false);
+        // Other 2 lanes are open
+        const openLane = (trainLane + 1) % 3;
+        this.spawnCollectiblesNear(zPos + 4, openLane);
+      }
+    }
+  }
+
+  // --- Subway Train Spawner (Subway Surfers Metro Vagoni) ---
+  private spawnTrain(lane: number, z: number, isMoving: boolean = false, hasRamp: boolean = false) {
+    const group = new THREE.Group();
+    const x = LANES[lane];
+    group.position.set(x, 0, z);
+
+    const trainL = 11.5;
+    const trainW = 2.25;
+    const trainH = 2.3;
+
+    // Train Body Palette: Subway Red (0xb91c1c), Metro Blue (0x1d4ed8), or Amber Steel (0xd97706)
+    const trainColors = [0xb91c1c, 0x1d4ed8, 0xd97706, 0x059669];
+    const trainColor = trainColors[Math.abs(lane + Math.floor(z / 40)) % trainColors.length];
+
+    // Main Wagon Body
+    const bodyGeo = new THREE.BoxGeometry(trainW, trainH, trainL);
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: trainColor,
+      roughness: 0.35,
+      metalness: 0.5,
+    });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = trainH / 2 + 0.15;
+    body.castShadow = this.quality === 'high';
+    group.add(body);
+
+    // Dark Corrugated Roof
+    const roofGeo = new THREE.BoxGeometry(trainW + 0.08, 0.18, trainL + 0.1);
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.6,
+      metalness: 0.4,
+    });
+    const roof = new THREE.Mesh(roofGeo, roofMat);
+    roof.position.y = trainH + 0.2;
+    group.add(roof);
+
+    // Front Windscreen / Driver Cabin
+    const windGeo = new THREE.BoxGeometry(trainW * 0.85, 0.75, 0.1);
+    const windMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      roughness: 0.1,
+      metalness: 0.9,
+    });
+    const windscreen = new THREE.Mesh(windGeo, windMat);
+    windscreen.position.set(0, trainH * 0.7, -trainL / 2 - 0.02);
+    group.add(windscreen);
+
+    // Front Headlights (Bright Glowing Lights facing player)
+    const lightGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.1, 12);
+    lightGeo.rotateX(Math.PI / 2);
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+
+    const leftLight = new THREE.Mesh(lightGeo, lightMat);
+    leftLight.position.set(-0.7, 0.75, -trainL / 2 - 0.04);
+    group.add(leftLight);
+
+    const rightLight = new THREE.Mesh(lightGeo, lightMat);
+    rightLight.position.set(0.7, 0.75, -trainL / 2 - 0.04);
+    group.add(rightLight);
+
+    // Front Bumper (Yellow/Black Hazard Stripes)
+    const bumperGeo = new THREE.BoxGeometry(trainW + 0.1, 0.4, 0.2);
+    const bumperMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      roughness: 0.5,
+    });
+    const bumper = new THREE.Mesh(bumperGeo, bumperMat);
+    bumper.position.set(0, 0.28, -trainL / 2 - 0.05);
+    group.add(bumper);
+
+    // Side Windows (4 on each side)
+    const windowGeo = new THREE.BoxGeometry(0.08, 0.65, 1.4);
+    const windowMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 });
+    for (let w = 0; w < 4; w++) {
+      const wZ = -trainL / 2 + 1.8 + w * 2.5;
+      const leftW = new THREE.Mesh(windowGeo, windowMat);
+      leftW.position.set(-trainW / 2 - 0.02, trainH * 0.68, wZ);
+      group.add(leftW);
+
+      const rightW = new THREE.Mesh(windowGeo, windowMat);
+      rightW.position.set(trainW / 2 + 0.02, trainH * 0.68, wZ);
+      group.add(rightW);
+    }
+
+    // Side Racing Stripe
+    const stripeGeo = new THREE.BoxGeometry(trainW + 0.04, 0.15, trainL);
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.y = trainH * 0.42;
+    group.add(stripe);
+
+    // Undercarriage Train Wheels (4 wheels)
+    const wheelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.2, 12);
+    wheelGeo.rotateZ(Math.PI / 2);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
+    [-trainL / 2 + 1.2, trainL / 2 - 1.2].forEach((wheelZ) => {
+      const w1 = new THREE.Mesh(wheelGeo, wheelMat);
+      w1.position.set(-trainW / 2 + 0.15, 0.28, wheelZ);
+      group.add(w1);
+
+      const w2 = new THREE.Mesh(wheelGeo, wheelMat);
+      w2.position.set(trainW / 2 - 0.15, 0.28, wheelZ);
+      group.add(w2);
+    });
+
+    // Optional Front Ramp (Subway Surfers Red/Amber Boarding Ramp with Upward Arrow ↑ like Image 1!)
+    if (hasRamp) {
+      const rampGroup = new THREE.Group();
+      // Sloped ramp extending from z = -trainL/2 - 4.4 (y=0) to z = -trainL/2 (y=2.45)
+      const rampGeo = new THREE.BoxGeometry(trainW + 0.14, 0.24, 4.95);
+      const rampMat = new THREE.MeshStandardMaterial({
+        color: 0x991b1b, // Iconic Subway Surfers Crimson/Maroon Ramp Base
+        roughness: 0.55,
+      });
+      const ramp = new THREE.Mesh(rampGeo, rampMat);
+      ramp.position.set(0, 1.22, -trainL / 2 - 2.1);
+      ramp.rotation.x = -0.525;
+      rampGroup.add(ramp);
+
+      // Upward Arrow (↑) Stem & Chevron painted on the Ramp Surface!
+      const arrowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+      const arrowStem = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.26, 2.6), arrowMat);
+      arrowStem.position.set(0, 1.24, -trainL / 2 - 2.1);
+      arrowStem.rotation.x = -0.525;
+      rampGroup.add(arrowStem);
+
+      const arrowHead = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.26, 0.55), arrowMat);
+      arrowHead.position.set(0, 1.88, -trainL / 2 - 0.95);
+      arrowHead.rotation.x = -0.525;
+      rampGroup.add(arrowHead);
+
+      // Yellow safety side rails on ramp so player clearly spots climbable trains
+      const railGeo = new THREE.BoxGeometry(0.14, 0.3, 4.95);
+      [-trainW / 2, trainW / 2].forEach((rx) => {
+        const rail = new THREE.Mesh(railGeo, arrowMat);
+        rail.position.set(rx, 1.32, -trainL / 2 - 2.1);
+        rail.rotation.x = -0.525;
+        rampGroup.add(rail);
+      });
+
+      group.add(rampGroup);
+
+      // Spawn gold coins leading up the ramp and across the train roof, plus a special Gift Box / Magnet / Boost at the roof end!
+      for (let c = 0; c < 5; c++) {
+        const coinZ = z - trainL / 2 - 1.5 + c * 2.4;
+        const coinY = c === 0 ? 1.35 : trainH + 0.65;
+        if (c === 4 && Math.random() < 0.55) {
+          const roofPowerups: ('box' | 'magnet' | 'boost')[] = ['box', 'magnet', 'boost'];
+          const pType = roofPowerups[Math.floor(Math.random() * roofPowerups.length)];
+          this.spawnPowerup(pType, lane, coinZ, trainH + 0.85);
+        } else {
+          this.spawnCoin(lane, coinZ, coinY);
         }
       }
-
-      // Spawn coins / powerups along this strip
-      this.spawnCollectiblesNear(zPos + 6);
     }
+
+    this.scene.add(group);
+
+    const bbox = new THREE.Box3();
+    bbox.setFromObject(group);
+
+    this.obstacles.push({
+      mesh: group,
+      lane,
+      z,
+      type: isMoving ? 'moving_train' : 'train',
+      speedZ: isMoving ? 8.5 : 0,
+      length: trainL,
+      rampLength: hasRamp ? 4.4 : 0,
+      hasRamp,
+      hit: false,
+      bbox,
+    });
   }
 
   private spawnLowBarrier(lane: number, z: number) {
@@ -1396,13 +1652,19 @@ export class GameEngine {
     });
   }
 
-  private spawnCollectiblesNear(z: number) {
-    const lane = Math.floor(Math.random() * 3);
+  private spawnCollectiblesNear(z: number, specificLane?: number) {
+    const lane = specificLane !== undefined ? specificLane : Math.floor(Math.random() * 3);
     const rand = Math.random();
 
-    // Check if we should spawn a rare powerup
-    if (rand < 0.12) {
-      const pTypes: ('magnet' | 'shield' | 'boost' | 'heart')[] = ['magnet', 'shield', 'boost'];
+    // Check if we should spawn a rare powerup or Mystery Gift Box (Sovg'a)
+    if (rand < 0.16) {
+      const pTypes: ('magnet' | 'shield' | 'boost' | 'sneakers' | 'box' | 'heart')[] = [
+        'magnet',
+        'boost',
+        'box',
+        'shield',
+        'sneakers',
+      ];
       if (this.health < this.maxHealth) {
         pTypes.push('heart');
       }
@@ -1425,18 +1687,25 @@ export class GameEngine {
     const x = LANES[lane];
     group.position.set(x, y, z);
 
-    // 3D Spinning Coin
+    // 3D Spinning Subway Star Coin
     const coinGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.1, 16);
     coinGeo.rotateZ(Math.PI / 2);
     const coinMat = new THREE.MeshStandardMaterial({
-      color: 0xfbbf24, // Gold
-      metalness: 0.85,
-      roughness: 0.2,
+      color: 0xfbbf24, // Bright Gold
+      metalness: 0.9,
+      roughness: 0.18,
       emissive: 0xf59e0b,
-      emissiveIntensity: 0.35,
+      emissiveIntensity: 0.4,
     });
     const coinMesh = new THREE.Mesh(coinGeo, coinMat);
     group.add(coinMesh);
+
+    // Embossed Star on Coin Faces
+    const starGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 5);
+    starGeo.rotateZ(Math.PI / 2);
+    const starMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    const starMesh = new THREE.Mesh(starGeo, starMat);
+    group.add(starMesh);
 
     this.scene.add(group);
 
@@ -1450,32 +1719,121 @@ export class GameEngine {
     });
   }
 
-  private spawnPowerup(type: 'magnet' | 'shield' | 'boost' | 'heart', lane: number, z: number) {
+  private spawnPowerup(
+    type: 'magnet' | 'shield' | 'boost' | 'sneakers' | 'box' | 'heart',
+    lane: number,
+    z: number,
+    y: number = 1.3
+  ) {
     const group = new THREE.Group();
     const x = LANES[lane];
-    group.position.set(x, 1.2, z);
+    group.position.set(x, y, z);
 
-    let color = 0x38bdf8;
-    if (type === 'shield') color = 0x10b981;
-    if (type === 'boost') color = 0xf97316;
-    if (type === 'heart') color = 0xef4444;
+    if (type === 'magnet') {
+      // Subway Surfers Iconic Red & Gold Horseshoe Magnet!
+      const magnetGroup = new THREE.Group();
+      const arcGeo = new THREE.TorusGeometry(0.45, 0.12, 12, 24, Math.PI);
+      arcGeo.rotateZ(Math.PI);
+      const arcMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.5, roughness: 0.3 });
+      const arc = new THREE.Mesh(arcGeo, arcMat);
+      magnetGroup.add(arc);
 
-    const orbGeo = new THREE.OctahedronGeometry(0.5, 2);
-    const orbMat = new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 0.7,
-      roughness: 0.15,
-      metalness: 0.3,
-    });
-    const orbMesh = new THREE.Mesh(orbGeo, orbMat);
-    group.add(orbMesh);
+      // Silver Magnetic Poles
+      const poleGeo = new THREE.BoxGeometry(0.24, 0.35, 0.24);
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9 });
+      [-0.45, 0.45].forEach((px) => {
+        const pole = new THREE.Mesh(poleGeo, poleMat);
+        pole.position.set(px, -0.22, 0);
+        magnetGroup.add(pole);
+      });
 
-    // Glowing outer halo ring
-    const ringGeo = new THREE.TorusGeometry(0.7, 0.05, 8, 20);
-    const ringMat = new THREE.MeshBasicMaterial({ color });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    group.add(ringMesh);
+      // Golden Aura
+      const aura = new THREE.Mesh(new THREE.TorusGeometry(0.65, 0.04, 8, 20), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+      magnetGroup.add(aura);
+
+      group.add(magnetGroup);
+    } else if (type === 'box') {
+      // Subway Surfers Iconic Mystery Gift Box (Sovg'a Qutisi)!
+      const boxGroup = new THREE.Group();
+      const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(0.66, 0.66, 0.66),
+        new THREE.MeshStandardMaterial({
+          color: 0xe11d48,
+          emissive: 0xbe123c,
+          emissiveIntensity: 0.35,
+          roughness: 0.25,
+        })
+      );
+      boxGroup.add(cube);
+
+      // Golden Cross Ribbons
+      const ribbonMat = new THREE.MeshStandardMaterial({
+        color: 0xfacc15,
+        metalness: 0.85,
+        roughness: 0.2,
+        emissive: 0xeab308,
+        emissiveIntensity: 0.4,
+      });
+      const rib1 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.16), ribbonMat);
+      const rib2 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.7, 0.7), ribbonMat);
+      boxGroup.add(rib1, rib2);
+
+      // Top Golden Bow
+      const bow1 = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.045, 8, 16), ribbonMat);
+      bow1.position.set(-0.12, 0.4, 0);
+      bow1.rotation.z = 0.4;
+      const bow2 = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.045, 8, 16), ribbonMat);
+      bow2.position.set(0.12, 0.4, 0);
+      bow2.rotation.z = -0.4;
+      boxGroup.add(bow1, bow2);
+
+      group.add(boxGroup);
+    } else if (type === 'sneakers') {
+      // Subway Surfers Iconic Green & White Super Sneakers!
+      const shoeGroup = new THREE.Group();
+      const sole = new THREE.Mesh(
+        new THREE.BoxGeometry(0.48, 0.18, 0.78),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 })
+      );
+      sole.position.y = -0.15;
+      shoeGroup.add(sole);
+
+      const upper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.44, 0.34, 0.62),
+        new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x16a34a, emissiveIntensity: 0.35 })
+      );
+      upper.position.set(0, 0.08, -0.05);
+      shoeGroup.add(upper);
+
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.65, 0.045, 8, 20),
+        new THREE.MeshBasicMaterial({ color: 0x4ade80 })
+      );
+      shoeGroup.add(ring);
+      group.add(shoeGroup);
+    } else {
+      let color = 0x38bdf8;
+      if (type === 'shield') color = 0x10b981;
+      if (type === 'boost') color = 0xf97316;
+      if (type === 'heart') color = 0xef4444;
+
+      const orbGeo = new THREE.OctahedronGeometry(0.5, 2);
+      const orbMat = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.7,
+        roughness: 0.15,
+        metalness: 0.3,
+      });
+      const orbMesh = new THREE.Mesh(orbGeo, orbMat);
+      group.add(orbMesh);
+
+      // Glowing outer halo ring
+      const ringGeo = new THREE.TorusGeometry(0.7, 0.05, 8, 20);
+      const ringMat = new THREE.MeshBasicMaterial({ color });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      group.add(ringMesh);
+    }
 
     this.scene.add(group);
 
@@ -1484,7 +1842,7 @@ export class GameEngine {
       type,
       lane,
       z,
-      y: 1.2,
+      y,
       collected: false,
     });
   }
@@ -1588,16 +1946,20 @@ export class GameEngine {
     this.activeParticleCount = (this.activeParticleCount + count) % max;
   }
 
-  // --- Player Controls (WASD / Arrows / Swipes / On-Screen Buttons) ---
+  // --- Player Controls (WASD / Arrows / Swipes) ---
   public moveLeft() {
     if (this.targetLaneIndex > 0) {
+      this.previousLaneIndex = this.targetLaneIndex;
       this.targetLaneIndex--;
+      soundManager.playLaneSwitch('left');
     }
   }
 
   public moveRight() {
     if (this.targetLaneIndex < 2) {
+      this.previousLaneIndex = this.targetLaneIndex;
       this.targetLaneIndex++;
+      soundManager.playLaneSwitch('right');
     }
   }
 
@@ -1606,15 +1968,16 @@ export class GameEngine {
       this.isJumping = true;
       this.isSliding = false;
       this.slideTimer = 0;
-      this.jumpVelocity = 14.2;
-      soundManager.playJump();
+      // Snappy Subway Surfers hop (1.28m): clears low hurdles cleanly, NEVER touches top of screen, and CANNOT jump onto ramp-less trains from ground!
+      this.jumpVelocity = this.activePowerup === 'sneakers' ? 15.2 : 9.8;
+      soundManager.playJump(this.activePowerup === 'sneakers');
     }
   }
 
   public slide() {
     this.isSliding = true;
     this.slideTimer = 0.75; // duration of slide
-    soundManager.playSlide();
+    soundManager.playSlide(this.isJumping);
 
     // If in mid-air, fast-drop down immediately
     if (this.isJumping) {
@@ -1643,6 +2006,25 @@ export class GameEngine {
   private updatePhysics(dt: number) {
     if (this.isGameOverState || this.isLevelFinished) return;
 
+    if (this.isLobbyMode) {
+      this.lobbyAnimTime += dt * 2.2;
+      const breathe = Math.sin(this.lobbyAnimTime);
+      this.playerBodyGroup.position.y = breathe * 0.035;
+      this.leftArmGroup.rotation.x = Math.sin(this.lobbyAnimTime * 0.8) * 0.1;
+      this.rightArmGroup.rotation.x = -Math.sin(this.lobbyAnimTime * 0.8) * 0.1;
+      this.leftLegGroup.rotation.x = 0;
+      this.rightLegGroup.rotation.x = 0;
+      this.playerBodyGroup.rotation.x = 0;
+      this.playerBodyGroup.rotation.z = 0;
+
+      // Gentle turntable sway in 3D lobby
+      this.playerGroup.rotation.y = Math.PI - 0.2 + Math.sin(this.lobbyAnimTime * 0.4) * 0.22;
+
+      this.camera.position.set(0, 1.45, this.playerZ - 3.4);
+      this.camera.lookAt(0, 1.15, this.playerZ);
+      return;
+    }
+
     // 1. Forward Movement
     const speedMultiplier = this.activePowerup === 'boost' ? 1.55 : 1.0;
     const forwardStep = this.currentSpeed * speedMultiplier * dt;
@@ -1654,20 +2036,85 @@ export class GameEngine {
     const dx = targetX - this.playerX;
     this.playerX += dx * Math.min(1, 20 * dt);
 
+    // Once player has settled into the target lane (or is running on a train roof), sync previousLaneIndex so player NEVER auto-shifts lanes later!
+    if (Math.abs(dx) < 0.15 || this.isOnTrainRoof) {
+      this.previousLaneIndex = this.targetLaneIndex;
+    }
+
     // Roll angle based on lane movement
     const bankAngle = -dx * 0.18;
     this.playerBodyGroup.rotation.z = bankAngle;
 
-    // 3. Jump Physics
+    // 3. Platform & Train Roof Ground Check (STRICT Subway Surfers Rule: ONLY climb via Front Ramp!)
+    let currentGroundY = 0;
+    const pZ = this.playerZ;
+    const pX = this.playerX;
+
+    for (let i = 0; i < this.obstacles.length; i++) {
+      const obs = this.obstacles[i];
+      if (obs.type === 'train' || obs.type === 'moving_train') {
+        const trainX = LANES[obs.lane];
+        const halfL = 11.5 / 2;
+        const trainFrontZ = obs.z - halfL;
+        const trainBackZ = obs.z + halfL;
+
+        // Check if player is in the train's lane
+        if (Math.abs(pX - trainX) < 1.25) {
+          // A. Climbing up the Front Ramp (ONLY if train has a ramp and player entered from the front!)
+          if (obs.hasRamp) {
+            const rampStartZ = trainFrontZ - 4.5;
+            if (pZ >= rampStartZ && pZ <= trainFrontZ + 0.4) {
+              const rampProgress = Math.max(0, Math.min(1, (pZ - rampStartZ) / 4.3));
+              const rampY = rampProgress * 2.45;
+              // Player must be within step-up height of the ramp slope (prevents climbing from the side!)
+              if (this.playerY >= rampY - 0.85 || this.isOnTrainRoof) {
+                currentGroundY = Math.max(currentGroundY, rampY);
+                if (rampProgress >= 0.65 && !this.isOnTrainRoof) {
+                  this.isOnTrainRoof = true;
+                  soundManager.playLand(true);
+                }
+              }
+            }
+          }
+
+          // B. Running on the Train Roof (ONLY if player ALREADY climbed a ramp or jumped from another train roof!)
+          if (pZ >= trainFrontZ && pZ <= trainBackZ) {
+            if (this.isOnTrainRoof || (this.activePowerup === 'sneakers' && this.playerY >= 2.35)) {
+              this.isOnTrainRoof = true;
+              currentGroundY = 2.45;
+            }
+          }
+        }
+      }
+    }
+
+    // Apply vertical physics with dynamic currentGroundY
     if (this.isJumping) {
       this.playerY += this.jumpVelocity * dt;
-      this.jumpVelocity -= 36 * dt; // Gravity
+      this.jumpVelocity -= 38 * dt; // Crisp Subway Surfers gravity
 
-      if (this.playerY <= 0) {
-        this.playerY = 0;
+      if (this.playerY <= currentGroundY) {
+        this.playerY = currentGroundY;
         this.isJumping = false;
         this.jumpVelocity = 0;
+        soundManager.playLand(this.isOnTrainRoof || currentGroundY >= 2.2);
       }
+    } else {
+      if (this.playerY > currentGroundY) {
+        // Player running off the back of a train or stepping down
+        this.playerY -= 30 * dt;
+        if (this.playerY < currentGroundY) {
+          this.playerY = currentGroundY;
+        }
+      } else if (this.playerY < currentGroundY) {
+        // Climbing up ramp smoothly
+        this.playerY = currentGroundY;
+      }
+    }
+
+    // Reset isOnTrainRoof when player drops below roof level and is not on a ramp
+    if (this.playerY < 1.9 && currentGroundY < 1.9) {
+      this.isOnTrainRoof = false;
     }
 
     // 4. Slide Physics & Animation
@@ -1733,12 +2180,12 @@ export class GameEngine {
     this.shadowMesh.scale.set(shadowScale, shadowScale, shadowScale);
     (this.shadowMesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0.1, 0.45 - this.playerY * 0.15);
 
-    // Update Player Bounding Box for Collisions
-    const effectiveHeight = this.isSliding ? 0.65 : 1.85;
+    // Update Player Bounding Box for Collisions (Scaled to 0.6 Subway Surfers proportions)
+    const effectiveHeight = this.isSliding ? 0.55 : 1.35;
     const minY = this.playerY;
     const maxY = this.playerY + effectiveHeight;
-    this.playerBox.min.set(this.playerX - 0.42, minY, this.playerZ - 0.42);
-    this.playerBox.max.set(this.playerX + 0.42, maxY, this.playerZ + 0.42);
+    this.playerBox.min.set(this.playerX - 0.36, minY, this.playerZ - 0.36);
+    this.playerBox.max.set(this.playerX + 0.36, maxY, this.playerZ + 0.36);
 
     // Speed increases continuously with distance survived!
     this.currentSpeed = Math.min(38, 21 + (this.playerZ / 320) * 1.5);
@@ -1783,26 +2230,32 @@ export class GameEngine {
     return 1;
   }
 
-  // --- Smooth Camera Following ---
+  // --- Smooth Camera Following (High Subway Surfers Angle — Head NEVER touches top of screen!) ---
   private updateCamera(dt: number) {
-    // Camera smoothly follows player with dramatic view of pursuer
-    const targetCamX = this.playerX * 0.45;
-    const targetCamY = 4.2 + this.playerY * 0.35;
-    const targetCamZ = this.playerZ - 8.2;
+    if (this.isLobbyMode) return;
 
-    this.camera.position.x += (targetCamX - this.camera.position.x) * Math.min(1, 10 * dt);
-    this.camera.position.y += (targetCamY - this.camera.position.y) * Math.min(1, 10 * dt);
-    this.camera.position.z += (targetCamZ - this.camera.position.z) * Math.min(1, 20 * dt);
+    const aspect = this.camera.aspect || 1;
+    const isPortraitMobile = aspect < 1.0;
 
-    // Camera LookAt
-    const lookX = this.playerX * 0.65;
-    const lookY = 1.5 + this.playerY * 0.3;
-    const lookZ = this.playerZ + 12;
+    // High Subway Surfers camera looking down at tracks; tracks playerY 1:1 so jumping never pushes head to top!
+    const targetCamX = this.playerX * (isPortraitMobile ? 0.36 : 0.45);
+    const targetCamY = (isPortraitMobile ? 6.6 : 5.9) + this.playerY * 1.0;
+    const targetCamZ = this.playerZ - (isPortraitMobile ? 9.8 : 8.6);
+
+    this.camera.position.x += (targetCamX - this.camera.position.x) * Math.min(1, 12 * dt);
+    this.camera.position.y += (targetCamY - this.camera.position.y) * Math.min(1, 25 * dt);
+    this.camera.position.z = targetCamZ;
+
+    // Camera LookAt rises 1:1 with playerY so player stays in lower half of screen at all times
+    const lookX = this.playerX * 0.6;
+    const lookY = 1.05 + this.playerY * 0.95;
+    const lookZ = this.playerZ + 14;
 
     this.camera.lookAt(lookX, lookY, lookZ);
 
-    // FOV dynamic expansion when boosting
-    const targetFov = this.activePowerup === 'boost' ? 76 : 64;
+    // Responsive FOV for mobile phones vs desktop + dynamic boost expansion
+    const baseFov = isPortraitMobile ? Math.min(82, Math.round(64 / Math.pow(aspect, 0.32))) : 64;
+    const targetFov = this.activePowerup === 'boost' ? baseFov + 10 : baseFov;
     if (Math.abs(this.camera.fov - targetFov) > 0.1) {
       this.camera.fov += (targetFov - this.camera.fov) * 5 * dt;
       this.camera.updateProjectionMatrix();
@@ -1891,22 +2344,62 @@ export class GameEngine {
         obs.bbox.setFromObject(obs.mesh);
       }
 
-      // Collision Detection with Player
-      if (!obs.hit && Math.abs(obs.z - pZ) < 2.5) {
-        // Bounding box intersection check
+      // Moving Oncoming Train update (travels toward player down the tracks!)
+      if (obs.type === 'moving_train' && obs.speedZ !== undefined) {
+        obs.z -= obs.speedZ * dt;
+        obs.mesh.position.z = obs.z;
         obs.bbox.setFromObject(obs.mesh);
+      }
 
-        let isColliding = this.playerBox.intersectsBox(obs.bbox);
+      // Collision Detection with Player
+      const checkDist = obs.type === 'train' || obs.type === 'moving_train' ? 11.5 : 2.5;
+      if (!obs.hit && Math.abs(obs.z - pZ) < checkDist) {
+        let isColliding = false;
 
-        // Special handling for high barrier (duck to avoid)
-        if (obs.type === 'high') {
-          // If player is sliding, they duck under the beam
-          if (this.isSliding) {
-            isColliding = false;
+        if (obs.type === 'train' || obs.type === 'moving_train') {
+          const trainX = LANES[obs.lane];
+          const inTrainLane = Math.abs(this.playerX - trainX) < 1.15;
+          const halfL = 11.5 / 2;
+          const trainFrontZ = obs.z - halfL;
+          const trainBackZ = obs.z + halfL;
+
+          if (inTrainLane) {
+            if (this.isOnTrainRoof || this.playerY >= 1.15 || pZ >= trainBackZ - 0.45) {
+              // Safely running on top of the train roof or dropping straight down off the back end of the train!
+              isColliding = false;
+            } else if (obs.hasRamp && pZ >= trainFrontZ - 5.0 && pZ <= trainFrontZ + 0.6) {
+              // Climbing up the front ramp — 100% safe!
+              isColliding = false;
+            } else if (pZ + 0.38 >= trainFrontZ && pZ < trainBackZ - 0.45) {
+              // Player is on the ground (not on roof) and hit the train!
+              // ONLY bounce back if player is actively mid-swipe into the side of the train from an adjacent lane!
+              const isActivelySwipingIn =
+                Math.abs(this.playerX - trainX) > 0.22 &&
+                this.targetLaneIndex === obs.lane &&
+                this.previousLaneIndex !== obs.lane;
+
+              if (pZ > trainFrontZ + 0.45 && isActivelySwipingIn) {
+                this.targetLaneIndex = this.previousLaneIndex;
+                this.screenShakeIntensity = 0.25;
+                soundManager.playStumble();
+                this.alertPoliceChaser();
+                isColliding = false;
+              } else {
+                // Direct front collision with a ramp-less train!
+                isColliding = true;
+              }
+            }
           }
-        } else if (obs.type === 'low') {
-          // If player is jumping sufficiently high (y > 1.2), they clear the hurdle
-          if (this.playerY > 1.15) {
+        } else {
+          // Standard barrier / block bounding box check
+          obs.bbox.setFromObject(obs.mesh);
+          isColliding = this.playerBox.intersectsBox(obs.bbox);
+
+          if (obs.type === 'high' && this.isSliding) {
+            // Ducking under high barrier
+            isColliding = false;
+          } else if (obs.type === 'low' && this.playerY > 0.85) {
+            // Jumping over low barrier
             isColliding = false;
           }
         }
@@ -1922,7 +2415,7 @@ export class GameEngine {
     // If boosting, smash through obstacle!
     if (this.activePowerup === 'boost') {
       obs.hit = true;
-      soundManager.playHit();
+      soundManager.playBoostSmash();
       this.triggerParticles(this.playerX, 1.2, obs.z, 20, 0xf97316);
       this.scene.remove(obs.mesh);
       this.score += 250;
@@ -1939,7 +2432,7 @@ export class GameEngine {
       this.activePowerup = 'none';
       this.powerupTimer = 0;
       this.shieldSphereMesh.visible = false;
-      soundManager.playHit();
+      soundManager.playShieldBreak();
       this.screenShakeIntensity = 0.3;
       this.invulnerableTimer = 1.2;
       this.triggerParticles(this.playerX, 1.2, this.playerZ, 25, 0x10b981);
@@ -2004,7 +2497,7 @@ export class GameEngine {
   }
 
   private collectItem(item: {
-    type: 'coin' | 'magnet' | 'shield' | 'boost' | 'heart';
+    type: 'coin' | 'magnet' | 'shield' | 'boost' | 'heart' | 'sneakers' | 'jetpack' | 'hoverboard' | '2x' | 'box';
     mesh: THREE.Object3D;
     collected: boolean;
     z: number;
@@ -2019,25 +2512,36 @@ export class GameEngine {
     } else if (item.type === 'magnet') {
       this.activePowerup = 'magnet';
       this.powerupTimer = 10;
-      soundManager.playPowerup();
+      soundManager.playMagnetPickup();
       this.triggerParticles(item.mesh.position.x, 1.2, item.z, 16, 0x38bdf8);
     } else if (item.type === 'shield') {
       this.activePowerup = 'shield';
       this.powerupTimer = 15;
       this.shieldSphereMesh.visible = true;
-      soundManager.playPowerup();
+      soundManager.playShieldPickup();
       this.triggerParticles(item.mesh.position.x, 1.2, item.z, 16, 0x10b981);
     } else if (item.type === 'boost') {
       this.activePowerup = 'boost';
       this.powerupTimer = 5;
-      soundManager.playPowerup();
+      soundManager.playSpeedBoost();
       this.triggerParticles(item.mesh.position.x, 1.2, item.z, 22, 0xf97316);
+    } else if (item.type === 'sneakers') {
+      this.activePowerup = 'sneakers';
+      this.powerupTimer = 12;
+      soundManager.playSneakersPickup();
+      this.triggerParticles(item.mesh.position.x, 1.2, item.z, 20, 0x22c55e);
+    } else if (item.type === 'box') {
+      // Mystery Gift Box (Sovg'a): awards bonus coins, score, and plays special Gift Box sound!
+      this.coins += 20;
+      this.score += 500 * this.multiplier;
+      soundManager.playGiftBox();
+      this.triggerParticles(item.mesh.position.x, 1.3, item.z, 28, 0xfacc15);
     } else if (item.type === 'heart') {
       if (this.health < this.maxHealth) {
         this.health++;
         this.callbacks.onHealthUpdate(this.health);
       }
-      soundManager.playPowerup();
+      soundManager.playHeartPickup();
       this.triggerParticles(item.mesh.position.x, 1.2, item.z, 18, 0xef4444);
     }
 

@@ -1,159 +1,154 @@
 import React from 'react';
-import { Heart, Pause, Zap, Shield, Magnet, ShoppingBag } from 'lucide-react';
+import { Heart, Pause, Zap, Shield, Magnet, ShoppingBag, Star, Volume2, VolumeX, Footprints } from 'lucide-react';
 import { LevelConfig, PlayerStats } from '../types/game';
 
 interface HUDProps {
   stats: PlayerStats;
   levelConfig: LevelConfig;
   highScore: number;
+  soundEnabled?: boolean;
   onPause: () => void;
   onOpenShop?: () => void;
+  onToggleSound?: () => void;
 }
 
 export const HUD: React.FC<HUDProps> = ({
   stats,
-  levelConfig,
   highScore,
+  soundEnabled = true,
   onPause,
   onOpenShop,
+  onToggleSound,
 }) => {
-  return (
-    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 z-20">
-      {/* Top Header Bar */}
-      <div className="flex flex-col gap-2 w-full max-w-5xl mx-auto">
-        <div className="flex items-center justify-between gap-3">
-          {/* Distance & Current Biome */}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] sm:text-xs uppercase tracking-widest font-black text-sky-400 font-mono flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                CHEKSIZ YUGURISH
-              </span>
-              <span className="text-slate-500 text-xs">·</span>
-              <span className="text-[11px] sm:text-xs font-semibold text-slate-300">
-                {stats.currentBiomeName || levelConfig.biome.name}
-              </span>
-            </div>
-            <div className="text-xl sm:text-2xl font-black tracking-tight text-white drop-shadow font-mono">
-              {stats.distance.toLocaleString()} <span className="text-xs text-sky-300 font-normal">metr</span>
-            </div>
-          </div>
+  const paddedScore = String(Math.floor(stats.score)).padStart(6, '0');
+  const totalBars = 10;
+  const filledBars = Math.max(
+    1,
+    Math.min(totalBars, Math.ceil((stats.powerupTimeRemaining / 8) * totalBars))
+  );
 
-          {/* Heart Lives */}
-          <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 pointer-events-auto shadow-md">
+  return (
+    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-4 z-20 select-none">
+      {/* TOP BAR: Exact Subway Surfers Layout (Left: Blue Pause & Hearts | Right: xMultiplier + 008040 Score, Coins, TOP RUN) */}
+      <div className="flex items-start justify-between w-full">
+        {/* TOP-LEFT: Iconic Blue Square Pause Button + Hearts + Sound + Shop */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <button
+            onClick={onPause}
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-b from-sky-400 to-blue-600 hover:from-sky-300 hover:to-blue-500 border-2 border-white shadow-[0_4px_0_#1e3a8a,0_6px_14px_rgba(0,0,0,0.5)] flex items-center justify-center active:scale-95 transition cursor-pointer"
+            title="To'xtatish (Pause)"
+          >
+            <Pause className="w-6 h-6 text-white fill-white drop-shadow" />
+          </button>
+
+          {/* Compact Hearts */}
+          <div className="flex items-center gap-1 bg-slate-950/60 backdrop-blur-sm px-2.5 py-1.5 rounded-xl border border-white/15">
             {Array.from({ length: stats.maxHealth }).map((_, i) => (
               <Heart
                 key={i}
-                className={`w-5 h-5 transition-all duration-300 ${
+                className={`w-4 h-4 sm:w-5 sm:h-5 transition-all ${
                   i < stats.health
-                    ? 'text-rose-500 fill-rose-500 animate-pulse'
-                    : 'text-slate-700'
+                    ? 'text-rose-500 fill-rose-500 drop-shadow-[0_0_6px_rgba(244,63,94,0.8)]'
+                    : 'text-slate-600/70'
                 }`}
               />
             ))}
           </div>
 
-          {/* Score & Coins */}
-          <div className="flex items-center gap-2.5 sm:gap-4">
-            <div className="text-right">
-              <div className="text-[10px] sm:text-xs text-slate-400 font-mono tracking-wider flex items-center justify-end gap-1.5">
-                <span>SCORE</span>
-                {stats.multiplier > 1 && (
-                  <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded">
-                    {stats.multiplier}x
-                  </span>
-                )}
-              </div>
-              <div className="text-lg sm:text-2xl font-black text-amber-400 font-mono leading-none">
-                {stats.score.toLocaleString()}
-              </div>
-              {highScore > 0 && (
-                <div className="text-[9px] sm:text-[10px] text-slate-400 font-mono">
-                  BEST: {highScore.toLocaleString()}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-2.5 sm:px-3 py-1.5 rounded-xl">
-              <div className="w-4 h-4 rounded-full bg-amber-400 border border-amber-200 shadow-sm flex items-center justify-center text-[10px] font-black text-amber-950">
-                ¢
-              </div>
-              <span className="font-mono font-bold text-amber-300 text-xs sm:text-sm">
-                {stats.coins}
-              </span>
-            </div>
-
-            {/* Shop Button */}
-            {onOpenShop && (
-              <button
-                onClick={onOpenShop}
-                className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 px-2.5 sm:px-3 py-1.5 rounded-xl pointer-events-auto transition active:scale-95 shadow-md cursor-pointer"
-                title="Do'kon: Qahramonlar va Kiyimlar"
-              >
-                <ShoppingBag className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-bold font-mono hidden sm:inline">DO'KON</span>
-              </button>
-            )}
-
-            {/* Pause Button */}
+          {onToggleSound && (
             <button
-              onClick={onPause}
-              className="p-2 sm:p-2.5 bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-800 pointer-events-auto transition active:scale-95 shadow-lg cursor-pointer"
-              title="Pause Game (Esc / P)"
+              onClick={onToggleSound}
+              className="p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-white/20 text-white shadow-md active:scale-95 transition cursor-pointer"
+              title={soundEnabled ? 'Ovozni o‘chirish' : 'Ovozni yoqish'}
             >
-              <Pause className="w-4 h-4 sm:w-5 sm:h-5" />
+              {soundEnabled ? (
+                <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+              ) : (
+                <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 text-rose-400" />
+              )}
             </button>
-          </div>
+          )}
+
+          {onOpenShop && (
+            <button
+              onClick={onOpenShop}
+              className="p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-amber-400/50 text-amber-300 shadow-md active:scale-95 transition cursor-pointer"
+              title="Qahramonlar Do'koni"
+            >
+              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+            </button>
+          )}
         </div>
 
-        {/* Police Chaser Proximity Alert Banner */}
-        {stats.chaserClose && (
-          <div className="w-full flex items-center justify-center animate-bounce">
-            <div className="bg-gradient-to-r from-blue-700 via-slate-900 to-rose-700 border-2 border-amber-400 text-white font-mono font-black text-xs sm:text-sm px-4 py-1.5 rounded-full shadow-xl shadow-blue-900/50 flex items-center gap-2">
-              <span className="animate-pulse text-base">🚨</span>
-              <span className="tracking-wide">POLITSIYACHI QUVALAMOQDA! TEZROQ QOCHING!</span>
-              <span className="animate-pulse text-base">🚨</span>
+        {/* TOP-RIGHT: Subway Surfers Score Stack (xMultiplier + 6-Digit Score -> Coins -> TOP RUN) */}
+        <div className="flex flex-col items-end gap-1.5">
+          {/* 1. Multiplier + 6-Digit Score Bar */}
+          <div className="flex items-center gap-2 bg-slate-950/65 backdrop-blur-sm px-3 py-1 rounded-xl border border-white/15 shadow-lg">
+            <div className="flex items-center gap-0.5 text-yellow-400 font-black text-sm sm:text-base italic drop-shadow">
+              <span>x{stats.multiplier}</span>
+              <Star className="w-4 h-4 fill-yellow-400 text-yellow-500" />
             </div>
-          </div>
-        )}
-      </div>
-
-        {/* Active Power-up Banner */}
-        {stats.activePowerup !== 'none' && (
-          <div className="self-center mt-1 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1 rounded-full border border-slate-700/80 shadow-lg animate-bounce">
-            {stats.activePowerup === 'magnet' && (
-              <>
-                <Magnet className="w-4 h-4 text-sky-400" />
-                <span className="text-xs font-bold text-sky-300">MAGNET</span>
-              </>
-            )}
-            {stats.activePowerup === 'shield' && (
-              <>
-                <Shield className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs font-bold text-emerald-300">ENERGY SHIELD</span>
-              </>
-            )}
-            {stats.activePowerup === 'boost' && (
-              <>
-                <Zap className="w-4 h-4 text-orange-400" />
-                <span className="text-xs font-bold text-orange-300">SUPER BOOST</span>
-              </>
-            )}
-            <span className="text-xs font-mono font-semibold text-slate-300">
-              {Math.ceil(stats.powerupTimeRemaining)}s
+            <span className="font-mono font-black text-white text-xl sm:text-2xl tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+              {paddedScore}
             </span>
           </div>
-        )}
 
-      {/* Low Health Critical Warning */}
-      {stats.health === 1 && (
-        <div className="self-center bg-rose-950/80 border border-rose-500/50 text-rose-200 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase animate-pulse">
-          Critical Health: Avoid Obstacles!
+          {/* 2. Gold Coins Counter Pill */}
+          <div className="flex items-center gap-1.5 bg-slate-950/65 backdrop-blur-sm px-3 py-0.5 rounded-xl border border-white/15 shadow-md">
+            <span className="font-mono font-black text-white text-base sm:text-lg drop-shadow">
+              {stats.coins}
+            </span>
+            <div className="w-5 h-5 rounded-full bg-gradient-to-b from-yellow-300 to-amber-500 border-2 border-yellow-100 shadow flex items-center justify-center text-[10px] font-black text-amber-950">
+              $
+            </div>
+          </div>
+
+          {/* 3. TOP RUN / HIGH SCORE Box (Matching Images 1, 2, 3, 5) */}
+          <div className="flex flex-col items-center bg-slate-950/65 backdrop-blur-sm px-2.5 py-1.5 rounded-xl border border-white/15 shadow-md">
+            <span className="text-[9px] font-black uppercase tracking-wider text-yellow-400 leading-none mb-1">
+              TOP RUN
+            </span>
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-b from-sky-400 to-blue-700 border-2 border-white flex items-center justify-center shadow-inner text-lg">
+              🏃
+            </div>
+            <span className="font-mono font-black text-white text-[11px] sm:text-xs mt-0.5 leading-none drop-shadow">
+              {Math.max(highScore, stats.score)}
+            </span>
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Bottom spacer for mobile controls */}
-      <div className="h-2" />
+      {/* BOTTOM-LEFT: Subway Surfers Segmented Powerup Timer Bar (Matching Image 1 & Image 5) */}
+      <div className="w-full flex items-end justify-between">
+        {stats.activePowerup !== 'none' ? (
+          <div className="flex items-center gap-1.5 bg-white/95 p-1 rounded-xl border-2 border-slate-800 shadow-xl">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-b from-amber-400 to-orange-500 border border-amber-200 flex items-center justify-center text-white shadow">
+              {stats.activePowerup === 'magnet' && <Magnet className="w-5 h-5 text-white" />}
+              {stats.activePowerup === 'shield' && <Shield className="w-5 h-5 text-white" />}
+              {stats.activePowerup === 'boost' && <Zap className="w-5 h-5 text-white fill-white" />}
+              {stats.activePowerup === 'sneakers' && <Footprints className="w-5 h-5 text-white" />}
+              {stats.activePowerup !== 'magnet' &&
+                stats.activePowerup !== 'shield' &&
+                stats.activePowerup !== 'boost' &&
+                stats.activePowerup !== 'sneakers' && <Star className="w-5 h-5 text-white fill-white" />}
+            </div>
+            <div className="flex items-center gap-0.5 pr-1.5">
+              {Array.from({ length: totalBars }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`w-2 h-5 rounded-xs transition-all ${
+                    idx < filledBars
+                      ? 'bg-gradient-to-b from-lime-400 to-green-600 border border-green-800'
+                      : 'bg-slate-300'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div />
+        )}
+      </div>
     </div>
   );
 };
