@@ -619,6 +619,112 @@ class SoundEngine {
   }
 
   /**
+   * Jetpack Pickup & Launch Sound ("Jetpack olganda reaktiv raketa parvozi ovozi")
+   */
+  public playJetpackPickup() {
+    this.initContext();
+    if (!this.ctx || !this.sfxGain || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // 1. Dual Rocket Thruster Ignition Roar (Filtered noise + rising jet turbine)
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.75);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const nFilter = this.ctx.createBiquadFilter();
+    nFilter.type = 'bandpass';
+    nFilter.frequency.setValueAtTime(300, t);
+    nFilter.frequency.exponentialRampToValueAtTime(2800, t + 0.45);
+    nFilter.frequency.exponentialRampToValueAtTime(1200, t + 0.75);
+    nFilter.Q.setValueAtTime(1.2, t);
+
+    const nGain = this.ctx.createGain();
+    nGain.gain.setValueAtTime(0.45, t);
+    nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
+
+    noise.connect(nFilter);
+    nFilter.connect(nGain);
+    nGain.connect(this.sfxGain);
+    noise.start(t);
+    noise.stop(t + 0.75);
+
+    // 2. Ascending Jet Turbine Whistle + Heroic Takeoff Arpeggio
+    const turbine = this.ctx.createOscillator();
+    const tGain = this.ctx.createGain();
+    turbine.type = 'sawtooth';
+    turbine.frequency.setValueAtTime(140, t);
+    turbine.frequency.exponentialRampToValueAtTime(920, t + 0.6);
+    tGain.gain.setValueAtTime(0.32, t);
+    tGain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+    turbine.connect(tGain);
+    tGain.connect(this.sfxGain);
+    turbine.start(t);
+    turbine.stop(t + 0.65);
+
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, idx) => {
+      if (!this.ctx || !this.sfxGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      const start = t + 0.1 + idx * 0.06;
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.3, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(start);
+      osc.stop(start + 0.25);
+    });
+  }
+
+  /**
+   * Hoverboard Pickup & Surf Sound ("Hoverboard olganda anti-gravitatsion syorf ovozi")
+   */
+  public playHoverboardPickup() {
+    this.initContext();
+    if (!this.ctx || !this.sfxGain || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // Electric anti-gravity hover board activation sweep
+    const sweep = this.ctx.createOscillator();
+    const sGain = this.ctx.createGain();
+    sweep.type = 'sine';
+    sweep.frequency.setValueAtTime(180, t);
+    sweep.frequency.exponentialRampToValueAtTime(740, t + 0.22);
+    sweep.frequency.exponentialRampToValueAtTime(440, t + 0.42);
+    sGain.gain.setValueAtTime(0.4, t);
+    sGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    sweep.connect(sGain);
+    sGain.connect(this.sfxGain);
+    sweep.start(t);
+    sweep.stop(t + 0.45);
+
+    // Bright skater chord shimmer
+    [440, 554.37, 659.25, 880].forEach((freq, i) => {
+      if (!this.ctx || !this.sfxGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      const start = t + i * 0.04;
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.28, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.28);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(start);
+      osc.stop(start + 0.28);
+    });
+  }
+
+  /**
    * Extra Heart / Life Pickup Sound (1-UP warm bell melody)
    */
   public playHeartPickup() {

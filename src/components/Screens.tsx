@@ -359,7 +359,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
               className="mt-1 px-4 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs rounded-full shadow-lg shadow-amber-500/40 flex items-center gap-1.5 active:scale-95 cursor-pointer transition animate-bounce"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>OCHISH: 🪙 {activeChar.price} TANGA</span>
+              <span>OCHISH: 🪙 {activeChar.price.toLocaleString()} TANGA</span>
             </button>
           )}
         </div>
@@ -482,7 +482,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                     ) : (
                       <span className="text-amber-400 flex items-center justify-center gap-0.5">
                         <Lock className="w-2.5 h-2.5" />
-                        {outfit.price}
+                        {outfit.price.toLocaleString()}
                       </span>
                     )}
                   </div>

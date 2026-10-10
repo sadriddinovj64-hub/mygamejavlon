@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Pause, Zap, Shield, Magnet, ShoppingBag, Star, Volume2, VolumeX, Footprints } from 'lucide-react';
+import { Heart, Pause, Zap, Shield, Magnet, ShoppingBag, Star, Volume2, VolumeX, Footprints, Rocket, Flame } from 'lucide-react';
 import { LevelConfig, PlayerStats } from '../types/game';
 
 interface HUDProps {
@@ -22,9 +22,17 @@ export const HUD: React.FC<HUDProps> = ({
 }) => {
   const paddedScore = String(Math.floor(stats.score)).padStart(6, '0');
   const totalBars = 10;
+  const maxDuration =
+    stats.activePowerup === 'jetpack' || stats.activePowerup === 'hoverboard' || stats.activePowerup === 'sneakers'
+      ? 12
+      : stats.activePowerup === 'shield'
+      ? 15
+      : stats.activePowerup === 'magnet'
+      ? 10
+      : 8;
   const filledBars = Math.max(
     1,
-    Math.min(totalBars, Math.ceil((stats.powerupTimeRemaining / 8) * totalBars))
+    Math.min(totalBars, Math.ceil((stats.powerupTimeRemaining / maxDuration) * totalBars))
   );
 
   return (
@@ -123,11 +131,15 @@ export const HUD: React.FC<HUDProps> = ({
         {stats.activePowerup !== 'none' ? (
           <div className="flex items-center gap-1.5 bg-white/95 p-1 rounded-xl border-2 border-slate-800 shadow-xl">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-b from-amber-400 to-orange-500 border border-amber-200 flex items-center justify-center text-white shadow">
+              {stats.activePowerup === 'jetpack' && <Rocket className="w-5 h-5 text-white" />}
+              {stats.activePowerup === 'hoverboard' && <Flame className="w-5 h-5 text-white fill-white" />}
               {stats.activePowerup === 'magnet' && <Magnet className="w-5 h-5 text-white" />}
               {stats.activePowerup === 'shield' && <Shield className="w-5 h-5 text-white" />}
               {stats.activePowerup === 'boost' && <Zap className="w-5 h-5 text-white fill-white" />}
               {stats.activePowerup === 'sneakers' && <Footprints className="w-5 h-5 text-white" />}
-              {stats.activePowerup !== 'magnet' &&
+              {stats.activePowerup !== 'jetpack' &&
+                stats.activePowerup !== 'hoverboard' &&
+                stats.activePowerup !== 'magnet' &&
                 stats.activePowerup !== 'shield' &&
                 stats.activePowerup !== 'boost' &&
                 stats.activePowerup !== 'sneakers' && <Star className="w-5 h-5 text-white fill-white" />}

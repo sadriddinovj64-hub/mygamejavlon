@@ -66,7 +66,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'bolt_dark',
         name: 'Dark Outfit Jake',
-        price: 80,
+        price: 2500,
         suitColor: 0x1e293b,
         armorColor: 0x0f172a,
         accentColor: 0xef4444,
@@ -76,7 +76,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'bolt_star',
         name: 'Star Outfit Jake',
-        price: 150,
+        price: 5000,
         suitColor: 0xf59e0b,
         armorColor: 0x1d4ed8,
         accentColor: 0xfacc15,
@@ -91,7 +91,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'titan',
     name: 'Tricky',
     role: 'Breakdance & Skater Qiz',
-    price: 100,
+    price: 3000,
     description: 'Qizil trikotaj shapka, qora ko‘zoynak, oq-qizil sport top va keng jinsi shim kiygan epchil qiz.',
     modelStyle: 'titan',
     outfits: [
@@ -108,7 +108,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'titan_camo',
         name: 'Camo Tricky',
-        price: 90,
+        price: 3000,
         suitColor: 0x65a30d,
         armorColor: 0x365314,
         accentColor: 0xfacc15,
@@ -118,7 +118,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'titan_heart',
         name: 'Heart Tricky',
-        price: 160,
+        price: 6000,
         suitColor: 0xec4899,
         armorColor: 0x831843,
         accentColor: 0xf43f5e,
@@ -133,7 +133,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'valkyrie',
     name: 'Fresh',
     role: 'Boombox & Hip-Hop Ustasi',
-    price: 150,
+    price: 6000,
     description: 'Baland tekis soch turmagi, ko‘zoynak, yashil mayka, qizil shortik va yelkasida ulkan kumush Boombox!',
     modelStyle: 'valkyrie',
     outfits: [
@@ -150,7 +150,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'valkyrie_funk',
         name: 'Funk Fresh',
-        price: 100,
+        price: 4500,
         suitColor: 0x8b5cf6,
         armorColor: 0x4c1d95,
         accentColor: 0xf59e0b,
@@ -165,7 +165,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'shinobi',
     name: 'Spike',
     role: 'Pank-Rok Isyonchisi',
-    price: 200,
+    price: 10000,
     description: 'Tikka turgan pank mohawk soch, oq ko‘ylak va ko‘k galstuk ustidan qora jilet hamda baland pank etiklar!',
     modelStyle: 'shinobi',
     outfits: [
@@ -182,7 +182,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'shinobi_rock',
         name: 'Glam Rock Spike',
-        price: 120,
+        price: 5500,
         suitColor: 0x991b1b,
         armorColor: 0x1e293b,
         accentColor: 0xfacc15,
@@ -197,7 +197,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'paladin',
     name: 'Yutani',
     role: 'O‘zga Sayyoralik Qiz (Alien Suit)',
-    price: 250,
+    price: 15000,
     description: 'Boshida ikkita katta oq ko‘zi va shoxchalari bor yoqimtoy yashil o‘zga sayyoralik kostyumidagi qiz!',
     modelStyle: 'paladin',
     outfits: [
@@ -214,7 +214,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'paladin_gadget',
         name: 'Kosmik Yutani',
-        price: 130,
+        price: 6500,
         suitColor: 0x06b6d4,
         armorColor: 0x0e7490,
         accentColor: 0xfacc15,
@@ -229,7 +229,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'king',
     name: 'King',
     role: 'Qirol Syorfer (Peace & Crown)',
-    price: 300,
+    price: 20000,
     description: 'Qizil-oq toj shapka, pushti dumaloq ko‘zoynak, Tinchlik (Peace) belgili ko‘k futbolka va qizil-yashil shortik!',
     modelStyle: 'king',
     outfits: [
@@ -246,7 +246,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'king_royal',
         name: 'Oltin King',
-        price: 150,
+        price: 7500,
         suitColor: 0x7e22ce,
         armorColor: 0xb45309,
         accentColor: 0xfacc15,
@@ -261,7 +261,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'zoe',
     name: 'Zoe',
     role: 'Zombi-Rokchi Qiz (Zombie Surfer)',
-    price: 350,
+    price: 25000,
     description: 'Yashil zombi terisi, sariq sochlar, qizil ko‘zoynak va qizil-qora ko‘cha kiyimidagi jasur qiz!',
     modelStyle: 'zoe',
     outfits: [
@@ -278,7 +278,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'zoe_curly',
         name: 'Neon Zoe',
-        price: 150,
+        price: 8500,
         suitColor: 0x9333ea,
         armorColor: 0x1e1b4b,
         accentColor: 0x4ade80,
@@ -293,7 +293,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'harumi',
     name: 'Harumi',
     role: 'Tokio Anime Qizi (Meow Surfer)',
-    price: 400,
+    price: 32000,
     description: 'Baland qora kokilli soch, qizil bantli oq-ko‘k yapon maktab formasi va pushti paypoqlar!',
     modelStyle: 'harumi',
     outfits: [
@@ -310,7 +310,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'harumi_kitty',
         name: 'Fury Harumi',
-        price: 160,
+        price: 9500,
         suitColor: 0xf43f5e,
         armorColor: 0x881337,
         accentColor: 0xfde047,
@@ -325,7 +325,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'pilot',
     name: 'Tagbot',
     role: 'Magnitli Ko‘cha Roboti',
-    price: 450,
+    price: 40000,
     description: 'Dumaloq kumush boshli, yashil LED ko‘zli va magnit bo‘g‘inli mashhur Subway Surfers roboti!',
     modelStyle: 'pilot',
     outfits: [
@@ -342,7 +342,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'pilot_toy',
         name: 'Space Tagbot',
-        price: 180,
+        price: 11000,
         suitColor: 0xf59e0b,
         armorColor: 0x1d4ed8,
         accentColor: 0xef4444,
@@ -357,7 +357,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'tasha',
     name: 'Tasha',
     role: 'Sportchi & Gimnastikachi Qiz',
-    price: 500,
+    price: 48000,
     description: 'Ikki tomonga bog‘langan sariq kokillar, qizil tasma va binafsha-pushti sport formasi!',
     modelStyle: 'tasha',
     outfits: [
@@ -374,7 +374,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'tasha_cheer',
         name: 'Cheer Tasha',
-        price: 170,
+        price: 12000,
         suitColor: 0x0284c7,
         armorColor: 0xf8fafc,
         accentColor: 0xfacc15,
@@ -389,7 +389,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'samurai',
     name: 'Ninja',
     role: 'Sharq Jang San’ati Ustasi',
-    price: 550,
+    price: 55000,
     description: 'Qora niqob, qizil peshona bandi va qora kimono kiygan chaqqon nindzya!',
     modelStyle: 'samurai',
     outfits: [
@@ -406,7 +406,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'samurai_flame',
         name: 'Yang Ninja',
-        price: 190,
+        price: 14000,
         suitColor: 0xf8fafc,
         armorColor: 0x1e293b,
         accentColor: 0xf59e0b,
@@ -421,7 +421,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'frank',
     name: 'Frank',
     role: 'Sirli Niqobli Jentlmen',
-    price: 600,
+    price: 65000,
     description: 'Qora smoking kostyum-shim, galstuk va yo‘lbars/masxaraboz niqobidagi sirli qahramon!',
     modelStyle: 'frank',
     outfits: [
@@ -438,7 +438,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
       {
         id: 'frank_gold',
         name: 'VIP Frank',
-        price: 200,
+        price: 16000,
         suitColor: 0x4c1d95,
         armorColor: 0x1e1b4b,
         accentColor: 0xfacc15,
@@ -453,7 +453,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'frizzy',
     name: 'Frizzy',
     role: 'Afro-Pop Raqqosa',
-    price: 650,
+    price: 75000,
     description: 'Baland jingalak soch turmagi, tilla ziraklar va yorqin to‘q sariq ko‘cha libosi!',
     modelStyle: 'frizzy',
     outfits: [
@@ -475,7 +475,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'cyberpunk',
     name: 'Lucy',
     role: 'Steampunk & Got-Pank Qiz',
-    price: 700,
+    price: 85000,
     description: 'Pushti-moviy sochlar, soatli shlyapa (Top Hat), yashil ko‘zoynak va pank uslubi!',
     modelStyle: 'cyberpunk',
     outfits: [
@@ -497,7 +497,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'carmen',
     name: 'Carmen',
     role: 'Rio Karnaval Qirolichasi',
-    price: 750,
+    price: 95000,
     description: 'Yashil, moviy va oltin patlardan yasalgan ulkan Rio karnaval toji kiygan raqqosa!',
     modelStyle: 'carmen',
     outfits: [
@@ -519,7 +519,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'biker',
     name: 'Roberto',
     role: 'Moto-Kaskadyor (Stunt Rider)',
-    price: 800,
+    price: 110000,
     description: 'Oq-ko‘k chiziqli motoshlem va sariq himoya ko‘zoynagi taqqan poygachi!',
     modelStyle: 'biker',
     outfits: [
@@ -541,7 +541,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'princek',
     name: 'Prince K',
     role: 'Hashamatli Shahzoda',
-    price: 900,
+    price: 125000,
     description: 'Yashil trikotaj shapka, qora quyosh ko‘zoynagi, tilla zanjir va oq-oltin kurtka!',
     modelStyle: 'princek',
     outfits: [
@@ -563,7 +563,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'frost',
     name: 'Brody',
     role: 'Plyaj va To‘lqin Syorferi',
-    price: 950,
+    price: 140000,
     description: 'Sariq sochli, jigarrang kepkali va plyaj kiyimidagi quyoshli syorfer yigit!',
     modelStyle: 'frost',
     outfits: [
@@ -585,7 +585,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'kim',
     name: 'Kim',
     role: 'Avstraliya Sayohatchisi',
-    price: 1000,
+    price: 160000,
     description: 'Keng qora shlyapa, qora ko‘zoynak va zamonaviy sayohat kurtkasidagi qahramon!',
     modelStyle: 'kim',
     outfits: [
@@ -607,7 +607,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'ella',
     name: 'Coco',
     role: 'Parij Rassomi & Mim',
-    price: 1100,
+    price: 180000,
     description: 'Qizil fransuz bereti, qora kare soch va chiziqli Parij ko‘ylagi!',
     modelStyle: 'ella',
     outfits: [
@@ -629,7 +629,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'sun',
     name: 'Sun',
     role: 'Afsonaviy Kung-Fu Qahramoni',
-    price: 1200,
+    price: 210000,
     description: 'Tilla peshona halqasi, qizil-sariq yuz bo‘yog‘i va tikka jangovar soch turmagi!',
     modelStyle: 'sun',
     outfits: [
@@ -651,7 +651,7 @@ export const CHARACTERS_CATALOG: CharacterItem[] = [
     id: 'alex',
     name: 'Alex',
     role: 'Qishki Skeyt Ustasi',
-    price: 1300,
+    price: 250000,
     description: 'Qizil quloqchinli shapka (ushanka), sariq mayka va epchil ko‘cha harakatlari!',
     modelStyle: 'alex',
     outfits: [

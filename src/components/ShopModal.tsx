@@ -318,7 +318,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                             }`}
                           >
                             <Lock className="w-3.5 h-3.5" />
-                            <span>{char.price} tanga</span>
+                            <span>{char.price.toLocaleString()} tanga</span>
                           </button>
                         )}
                       </div>
@@ -413,7 +413,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                             }`}
                           >
                             <Lock className="w-3 h-3" />
-                            <span>{outfit.price} tanga</span>
+                            <span>{outfit.price.toLocaleString()} tanga</span>
                           </button>
                         )}
                       </div>

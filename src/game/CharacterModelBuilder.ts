@@ -10,6 +10,7 @@ export interface BuiltCharacterRig {
   headMesh: THREE.Mesh;
   floatingAccents?: THREE.Object3D[];
   hoverboardMesh?: THREE.Object3D;
+  jetpackMesh?: THREE.Object3D;
   sprayCanInHand?: THREE.Object3D;
 }
 
@@ -197,26 +198,149 @@ export function buildCharacterRig(
 
   // Variable refs for return rig
   let hoverboardMesh: THREE.Object3D | undefined;
+  let jetpackMesh: THREE.Object3D | undefined;
   let sprayCanInHand: THREE.Object3D | undefined;
 
-  // 2. Toggleable Hoverboard (Hidden during normal standing/running, shown during hoverboard powerup)
+  // 2A. Iconic Subway Surfers 3D Hoverboard (Under player's feet during Hoverboard powerup)
   const boardGroup = new THREE.Group();
-  boardGroup.position.set(0, -0.05, 0);
+  boardGroup.position.set(0, -0.04, 0);
 
+  // Main sleek surfboard/skateboard deck
   const board = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.07, 1.62),
-    new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.3, metalness: 0.4 })
+    new THREE.BoxGeometry(0.84, 0.08, 1.92),
+    new THREE.MeshStandardMaterial({
+      color: 0xdc2626,
+      emissive: 0x991b1b,
+      emissiveIntensity: 0.25,
+      roughness: 0.25,
+      metalness: 0.45,
+    })
   );
   boardGroup.add(board);
 
+  // Angled Nose & Tail Tips
+  const tipGeo = new THREE.BoxGeometry(0.68, 0.075, 0.34);
+  const tipMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3, metalness: 0.4 });
+  const frontTip = new THREE.Mesh(tipGeo, tipMat);
+  frontTip.position.set(0, 0.04, 1.02);
+  frontTip.rotation.x = -0.25;
+  boardGroup.add(frontTip);
+
+  const backTip = new THREE.Mesh(tipGeo, tipMat);
+  backTip.position.set(0, 0.04, -1.02);
+  backTip.rotation.x = 0.25;
+  boardGroup.add(backTip);
+
+  // Yellow & Cyan Racing Stripes on Deck
   const bStripe = new THREE.Mesh(
-    new THREE.BoxGeometry(0.2, 0.08, 1.56),
+    new THREE.BoxGeometry(0.24, 0.09, 1.84),
     new THREE.MeshBasicMaterial({ color: 0xfacc15 })
   );
   boardGroup.add(bStripe);
+
+  [-0.3, 0.3].forEach((sx) => {
+    const sideRail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.088, 1.76),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    sideRail.position.set(sx, 0, 0);
+    boardGroup.add(sideRail);
+  });
+
+  // Glowing Anti-Gravity Thruster Pads Underneath & Rear Flame Emitters
+  const padGeo = new THREE.CylinderGeometry(0.26, 0.26, 0.05, 16);
+  const padMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+  [-0.55, 0.55].forEach((pz) => {
+    const pad = new THREE.Mesh(padGeo, padMat);
+    pad.position.set(0, -0.05, pz);
+    boardGroup.add(pad);
+  });
+
+  [-0.22, 0.22].forEach((nx) => {
+    const rearFlame = new THREE.Mesh(
+      new THREE.ConeGeometry(0.11, 0.45, 8),
+      new THREE.MeshBasicMaterial({ color: 0xf97316 })
+    );
+    rearFlame.rotation.x = -Math.PI / 2;
+    rearFlame.position.set(nx, -0.01, -1.22);
+    boardGroup.add(rearFlame);
+  });
+
   boardGroup.visible = false;
   parentGroup.add(boardGroup);
   hoverboardMesh = boardGroup;
+
+  // 2B. Iconic Subway Surfers Twin Spray-Can Jetpack (On player's back during Jetpack flight)
+  const jpGroup = new THREE.Group();
+  jpGroup.position.set(0, 1.08, -torsoD / 2 - 0.16);
+
+  // Metallic Back Harness Plate
+  const harness = new THREE.Mesh(
+    new THREE.BoxGeometry(0.58, 0.52, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.25 })
+  );
+  jpGroup.add(harness);
+
+  // Twin Spray-Can Rocket Cylinders (Left: Red/Gold, Right: Cyan/Gold)
+  [-0.22, 0.22].forEach((tx, idx) => {
+    const tankColor = idx === 0 ? 0xef4444 : 0x0284c7;
+    const tank = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.15, 0.72, 14),
+      new THREE.MeshStandardMaterial({
+        color: tankColor,
+        roughness: 0.25,
+        metalness: 0.55,
+      })
+    );
+    tank.position.set(tx, 0.02, -0.06);
+    jpGroup.add(tank);
+
+    // Golden Band around each cylinder
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.158, 0.158, 0.12, 14),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+    );
+    band.position.set(tx, 0.08, -0.06);
+    jpGroup.add(band);
+
+    // Silver Dome Top Cap
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.145, 12, 12),
+      new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.15 })
+    );
+    dome.position.set(tx, 0.38, -0.06);
+    jpGroup.add(dome);
+
+    // Bottom Exhaust Nozzle
+    const nozzle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.13, 0.16, 12),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 })
+    );
+    nozzle.position.set(tx, -0.4, -0.06);
+    jpGroup.add(nozzle);
+
+    // Outer Thruster Flame Cone
+    const outerFlame = new THREE.Mesh(
+      new THREE.ConeGeometry(0.14, 0.65, 10),
+      new THREE.MeshBasicMaterial({ color: 0xf97316 })
+    );
+    outerFlame.rotation.x = Math.PI;
+    outerFlame.position.set(tx, -0.75, -0.06);
+    jpGroup.add(outerFlame);
+
+    // Inner White-Yellow Core Flame Cone
+    const innerFlame = new THREE.Mesh(
+      new THREE.ConeGeometry(0.08, 0.42, 8),
+      new THREE.MeshBasicMaterial({ color: 0xfef08a })
+    );
+    innerFlame.rotation.x = Math.PI;
+    innerFlame.position.set(tx, -0.64, -0.06);
+    jpGroup.add(innerFlame);
+  });
+
+  jpGroup.visible = false;
+  parentGroup.add(jpGroup);
+  jetpackMesh = jpGroup;
 
   // Back & Shoulder Props (Fresh's Boombox, Jake's Hood, etc.)
   if (style === 'valkyrie') {
@@ -891,6 +1015,7 @@ export function buildCharacterRig(
     headMesh,
     floatingAccents,
     hoverboardMesh,
+    jetpackMesh,
     sprayCanInHand,
   };
 }

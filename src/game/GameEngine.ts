@@ -17,6 +17,129 @@ const LANES = [2.6, 0, -2.6]; // Index 0: Chap (Screen Left, +X), Index 1: Marka
 const SEGMENT_LENGTH = 36;
 const VISIBLE_SEGMENTS = 9; // ~324 meters ahead
 
+// Shared Geometry & Material Cache to eliminate mid-game WebGL allocations and GC stutter
+let sharedAssetsCache: {
+  coinGeo: THREE.CylinderGeometry;
+  coinMat: THREE.MeshStandardMaterial;
+  starGeo: THREE.CylinderGeometry;
+  starMat: THREE.MeshBasicMaterial;
+  trainBodyGeo: THREE.BoxGeometry;
+  trainBodyMats: THREE.MeshStandardMaterial[];
+  trainRoofGeo: THREE.BoxGeometry;
+  trainRoofMat: THREE.MeshStandardMaterial;
+  trainWindGeo: THREE.BoxGeometry;
+  trainWindMat: THREE.MeshStandardMaterial;
+  trainLightGeo: THREE.CylinderGeometry;
+  trainLightMat: THREE.MeshBasicMaterial;
+  trainBumperGeo: THREE.BoxGeometry;
+  trainBumperMat: THREE.MeshStandardMaterial;
+  trainWindowGeo: THREE.BoxGeometry;
+  trainWindowMat: THREE.MeshStandardMaterial;
+  trainStripeGeo: THREE.BoxGeometry;
+  trainStripeMat: THREE.MeshBasicMaterial;
+  trainWheelGeo: THREE.CylinderGeometry;
+  trainWheelMat: THREE.MeshStandardMaterial;
+  rampGeo: THREE.BoxGeometry;
+  rampMat: THREE.MeshStandardMaterial;
+  arrowStemGeo: THREE.BoxGeometry;
+  arrowHeadGeo: THREE.BoxGeometry;
+  rampRailGeo: THREE.BoxGeometry;
+  arrowMat: THREE.MeshBasicMaterial;
+  lowBarGeo: THREE.BoxGeometry;
+  lowBarMat: THREE.MeshStandardMaterial;
+  lowTopGeo: THREE.BoxGeometry;
+  lowTopMat: THREE.MeshStandardMaterial;
+  lowLegGeo: THREE.BoxGeometry;
+  highPillarGeo: THREE.BoxGeometry;
+  highPillarMat: THREE.MeshStandardMaterial;
+  highBeamGeo: THREE.BoxGeometry;
+  highBeamMat: THREE.MeshStandardMaterial;
+  highSignGeo: THREE.PlaneGeometry;
+  highSignMat: THREE.MeshBasicMaterial;
+} | null = null;
+
+function getSharedAssets() {
+  if (sharedAssetsCache) return sharedAssetsCache;
+
+  const coinGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.1, 16);
+  coinGeo.rotateZ(Math.PI / 2);
+  const coinMat = new THREE.MeshStandardMaterial({
+    color: 0xfbbf24,
+    metalness: 0.9,
+    roughness: 0.18,
+    emissive: 0xf59e0b,
+    emissiveIntensity: 0.4,
+  });
+
+  const starGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 5);
+  starGeo.rotateZ(Math.PI / 2);
+  const starMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+
+  const trainL = 11.5;
+  const trainW = 2.25;
+  const trainH = 2.3;
+  const trainColors = [0xb91c1c, 0x1d4ed8, 0xd97706, 0x059669];
+
+  const trainLightGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.1, 12);
+  trainLightGeo.rotateX(Math.PI / 2);
+
+  const trainWheelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.2, 12);
+  trainWheelGeo.rotateZ(Math.PI / 2);
+
+  sharedAssetsCache = {
+    coinGeo,
+    coinMat,
+    starGeo,
+    starMat,
+    trainBodyGeo: new THREE.BoxGeometry(trainW, trainH, trainL),
+    trainBodyMats: trainColors.map(
+      (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.35, metalness: 0.5 })
+    ),
+    trainRoofGeo: new THREE.BoxGeometry(trainW + 0.08, 0.18, trainL + 0.1),
+    trainRoofMat: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6, metalness: 0.4 }),
+    trainWindGeo: new THREE.BoxGeometry(trainW * 0.85, 0.75, 0.1),
+    trainWindMat: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 }),
+    trainLightGeo,
+    trainLightMat: new THREE.MeshBasicMaterial({ color: 0xfef08a }),
+    trainBumperGeo: new THREE.BoxGeometry(trainW + 0.1, 0.4, 0.2),
+    trainBumperMat: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.5 }),
+    trainWindowGeo: new THREE.BoxGeometry(0.08, 0.65, 1.4),
+    trainWindowMat: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 }),
+    trainStripeGeo: new THREE.BoxGeometry(trainW + 0.04, 0.15, trainL),
+    trainStripeMat: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    trainWheelGeo,
+    trainWheelMat: new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 }),
+    rampGeo: new THREE.BoxGeometry(trainW + 0.14, 0.24, 4.95),
+    rampMat: new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.55 }),
+    arrowStemGeo: new THREE.BoxGeometry(0.32, 0.26, 2.6),
+    arrowHeadGeo: new THREE.BoxGeometry(0.95, 0.26, 0.55),
+    rampRailGeo: new THREE.BoxGeometry(0.14, 0.3, 4.95),
+    arrowMat: new THREE.MeshBasicMaterial({ color: 0xfacc15 }),
+    lowBarGeo: new THREE.BoxGeometry(2.3, 0.42, 0.35),
+    lowBarMat: new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 }),
+    lowTopGeo: new THREE.BoxGeometry(2.35, 0.1, 0.38),
+    lowTopMat: new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      emissive: 0xfacc15,
+      emissiveIntensity: 0.3,
+    }),
+    lowLegGeo: new THREE.BoxGeometry(0.2, 0.7, 0.35),
+    highPillarGeo: new THREE.BoxGeometry(0.28, 2.7, 0.3),
+    highPillarMat: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3, metalness: 0.2 }),
+    highBeamGeo: new THREE.BoxGeometry(2.4, 1.3, 0.4),
+    highBeamMat: new THREE.MeshStandardMaterial({
+      color: 0xe11d48,
+      emissive: 0x9f1239,
+      emissiveIntensity: 0.3,
+      roughness: 0.3,
+    }),
+    highSignGeo: new THREE.PlaneGeometry(1.2, 0.4),
+    highSignMat: new THREE.MeshBasicMaterial({ color: 0xfef08a }),
+  };
+
+  return sharedAssetsCache;
+}
+
 export class GameEngine {
   private container: HTMLElement;
   private callbacks: GameEngineCallbacks;
@@ -86,7 +209,19 @@ export class GameEngine {
   private activePowerup: PowerupType = 'none';
   private powerupTimer: number = 0;
   private hoverboardMesh: THREE.Object3D | null = null;
+  private jetpackMesh: THREE.Object3D | null = null;
   private sprayCanMesh: THREE.Object3D | null = null;
+  private lastSkyCoinZ: number = 0;
+  private skyCoinLaneIndex: number = 1;
+  private skyCoinWaveStep: number = 0;
+  private jetpackTrailTimer: number = 0;
+  private lastAnyTrainZ: number = -999;
+  private lastTrainZByLane: [number, number, number] = [-999, -999, -999];
+  private lastFlightPowerupZ: number = 0;
+  private hudUpdateTimer: number = 0;
+  private lastHudCoins: number = -1;
+  private lastHudHealth: number = -1;
+  private lastHudPowerup: PowerupType = 'none';
 
   // Gameplay State
   private health: number = 3;
@@ -334,6 +469,7 @@ export class GameEngine {
     this.torsoMesh = rig.torsoMesh;
     this.headMesh = rig.headMesh;
     this.hoverboardMesh = rig.hoverboardMesh || null;
+    this.jetpackMesh = rig.jetpackMesh || null;
     this.sprayCanMesh = rig.sprayCanInHand || null;
 
     const s = this.isLobbyMode ? 0.85 : 0.6;
@@ -341,6 +477,9 @@ export class GameEngine {
 
     if (this.hoverboardMesh) {
       this.hoverboardMesh.visible = this.activePowerup === 'hoverboard';
+    }
+    if (this.jetpackMesh) {
+      this.jetpackMesh.visible = this.activePowerup === 'jetpack';
     }
     if (this.sprayCanMesh) {
       this.sprayCanMesh.visible = this.isLobbyMode;
@@ -742,7 +881,18 @@ export class GameEngine {
     for (let i = 0; i < VISIBLE_SEGMENTS; i++) {
       const z = i * SEGMENT_LENGTH;
       this.createRoadSegment(z);
-      if (i > 0) {
+      if (i === 0) {
+        // Spawn starter coins and immediate introductory hurdles right on the first segment!
+        for (let c = 0; c < 4; c++) {
+          this.spawnCoin(1, 9 + c * 2.8, 0.9);
+        }
+        this.spawnLowBarrier(0, 18);
+        this.spawnHighBarrier(2, 18);
+        this.spawnLowBarrier(1, 26);
+        this.spawnCoin(1, 26, 1.9);
+        this.spawnHighBarrier(0, 32);
+        this.spawnLowBarrier(2, 32);
+      } else {
         this.populateSegment(z);
       }
     }
@@ -854,9 +1004,9 @@ export class GameEngine {
 
     group.add(gantryGroup);
 
-    // 3 Overhead Power Cables along the segment (High at y = 12.95)
+    // 3 Overhead Power Cables along the segment (High at y = 12.95 — Jetpack & Hoverboard fly cleanly below these wires!)
     LANES.forEach((lx) => {
-      const cableGeo = new THREE.BoxGeometry(0.025, 0.025, SEGMENT_LENGTH);
+      const cableGeo = new THREE.BoxGeometry(0.05, 0.05, SEGMENT_LENGTH);
       const cableMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
       const cable = new THREE.Mesh(cableGeo, cableMat);
       cable.position.set(lx, 12.95, SEGMENT_LENGTH / 2);
@@ -1223,73 +1373,144 @@ export class GameEngine {
   }
 
   // --- Obstacle & Collectible Spawning (Subway Surfers Style) ---
+  private canSpawnTrainAt(lane: number, z: number): boolean {
+    // Strictly prevent any train from spawning behind another train in the same lane (< 65m) or overlapping (< 32m)!
+    if (z - this.lastTrainZByLane[lane] < 65) return false;
+    if (z - this.lastAnyTrainZ < 32) return false;
+
+    for (let i = 0; i < this.obstacles.length; i++) {
+      const obs = this.obstacles[i];
+      if (obs.type === 'train' || obs.type === 'moving_train') {
+        if (obs.lane === lane && Math.abs(obs.z - z) < 65) return false;
+        if (Math.abs(obs.z - z) < 32) return false;
+      }
+    }
+    return true;
+  }
+
   private populateSegment(startZ: number) {
     // Don't spawn obstacles right next to the finish portal
     if (startZ > this.finishZ - 45) return;
 
-    // Number of patterns per 48m segment: 2 well-spaced patterns (24m gap between them)
-    const numPatterns = 2;
+    const zPos = startZ + 18;
+    if (zPos > this.finishZ - 30) return;
 
-    for (let i = 0; i < numPatterns; i++) {
-      const zPos = startZ + 12 + i * 23;
-      if (zPos > this.finishZ - 30) continue;
+    const rand = Math.random();
+    const canPlaceTrainHere = startZ >= 36 && zPos - this.lastAnyTrainZ >= 34;
 
-      const rand = Math.random();
+    // High train frequency (78% of segments have trains!), plus dense multi-wave hurdles in the ground lanes!
+    if (canPlaceTrainHere && rand < 0.78) {
+      // Find candidate lanes that did NOT have a train in the previous segment
+      const availableLanes = [0, 1, 2].filter((l) => this.canSpawnTrainAt(l, zPos));
 
-      // Subway Surfers Rule: ALWAYS guarantee at least 1 open lane AND clear ramped vs ramp-less trains (like Image 1)!
-      if (startZ >= 48 && rand < 0.44) {
-        // Pattern 1: Climbable Train with Front Ramp + Adjacent Ramp-less Train + 100% Open Lane!
-        const rampTrainLane = Math.floor(Math.random() * 3);
-        const noRampTrainLane = (rampTrainLane + 1) % 3;
-        const openLane = (rampTrainLane + 2) % 3;
+      if (availableLanes.length >= 2 && Math.random() < 0.58) {
+        // Pattern 1: Climbable Train with Front Ramp + Adjacent Ramp-less Train at the same Z + Action-packed Ground Lane with Hurdles!
+        const rampTrainLane = availableLanes[Math.floor(Math.random() * availableLanes.length)];
+        const secondCandidates = availableLanes.filter((l) => l !== rampTrainLane);
+        const noRampTrainLane = secondCandidates[Math.floor(Math.random() * secondCandidates.length)];
+        const openLane = [0, 1, 2].find((l) => l !== rampTrainLane && l !== noRampTrainLane) ?? 1;
 
-        // Train WITH Front Ramp (Player CAN climb from front!)
         this.spawnTrain(rampTrainLane, zPos, false, true);
-
-        // Train WITHOUT Ramp (Player CANNOT climb from ground — only reachable by jumping across from the ramped train's roof!)
-        this.spawnTrain(noRampTrainLane, zPos + 2.5, false, false);
+        this.spawnTrain(noRampTrainLane, zPos, false, false);
         for (let c = 0; c < 4; c++) {
-          this.spawnCoin(noRampTrainLane, zPos - 2.0 + c * 2.2, 3.05);
+          this.spawnCoin(noRampTrainLane, zPos - 3.5 + c * 2.2, 3.05);
         }
 
-        // Spawn line of coins through the 100% open ground lane!
-        this.spawnCollectiblesNear(zPos + 4, openLane);
-      } else if (startZ >= 96 && rand < 0.62) {
-        // Pattern 2: Train with Ramp + Low Hurdle in 2nd lane + Open 3rd lane
-        const trainLane = Math.floor(Math.random() * 3);
-        this.spawnTrain(trainLane, zPos, false, true);
+        // Pre-train & Mid-lane hurdles in the ground lane so the player jumps/slides through obstacles!
+        if (Math.random() < 0.5) {
+          this.spawnLowBarrier(openLane, startZ + 6);
+          this.spawnCoin(openLane, startZ + 6, 1.9);
+        } else {
+          this.spawnHighBarrier(openLane, startZ + 6);
+          this.spawnCoin(openLane, startZ + 6, 0.9);
+        }
 
-        const hurdleLane = (trainLane + 1) % 3;
-        const openLane = (trainLane + 2) % 3;
-        this.spawnLowBarrier(hurdleLane, zPos);
-        this.spawnCollectiblesNear(zPos + 4, openLane);
-      } else if (rand < 0.75) {
-        // Pattern 3: Low Hurdle Barricade (MUST JUMP: 'W / Tepa')
-        const hurdleLane = Math.floor(Math.random() * 3);
-        this.spawnLowBarrier(hurdleLane, zPos);
-        // Other 2 lanes are open
-        const openLane = (hurdleLane + 1) % 3;
-        this.spawnCollectiblesNear(zPos + 4, openLane);
-      } else if (rand < 0.90) {
-        // Pattern 4: High Clearance Barrier (MUST SLIDE: 'S / Past')
-        const highLane = Math.floor(Math.random() * 3);
-        this.spawnHighBarrier(highLane, zPos);
-        // Other 2 lanes are open
-        const openLane = (highLane + 1) % 3;
-        this.spawnCollectiblesNear(zPos + 4, openLane);
-      } else {
-        // Pattern 5: Oncoming Train rushing down track!
-        const trainLane = Math.floor(Math.random() * 3);
-        this.spawnTrain(trainLane, zPos + 10, true, false);
-        // Other 2 lanes are open
-        const openLane = (trainLane + 1) % 3;
-        this.spawnCollectiblesNear(zPos + 4, openLane);
+        if (Math.random() < 0.55) {
+          this.spawnHighBarrier(openLane, zPos - 2);
+          this.spawnLowBarrier(openLane, zPos + 7);
+          this.spawnCoin(openLane, zPos + 7, 1.9);
+        } else {
+          this.spawnLowBarrier(openLane, zPos - 2);
+          this.spawnCoin(openLane, zPos - 2, 1.9);
+          this.spawnHighBarrier(openLane, zPos + 7);
+        }
+
+        // Post-train hurdle in the open lane at the end of the segment
+        if (Math.random() < 0.5) {
+          this.spawnLowBarrier(openLane, startZ + 32);
+        } else {
+          this.spawnHighBarrier(openLane, startZ + 32);
+        }
+        this.spawnCollectiblesNear(zPos + 1, openLane);
+        return;
+      } else if (availableLanes.length >= 1) {
+        // Pattern 2: Train + Dense Multi-Wave Hurdles across the 2 Ground Lanes!
+        const trainLane = availableLanes[Math.floor(Math.random() * availableLanes.length)];
+        const otherLanes = [0, 1, 2].filter((l) => l !== trainLane);
+        const laneA = otherLanes[0];
+        const laneB = otherLanes[1];
+
+        const hasRamp = Math.random() < 0.75;
+        this.spawnTrain(trainLane, zPos, false, hasRamp);
+        if (!hasRamp) {
+          for (let c = 0; c < 4; c++) {
+            this.spawnCoin(trainLane, zPos - 3.5 + c * 2.2, 3.05);
+          }
+        }
+
+        // Wave 1 (startZ + 6): Hurdles in both ground lanes
+        this.spawnLowBarrier(laneA, startZ + 6);
+        this.spawnCoin(laneA, startZ + 6, 1.9);
+        this.spawnHighBarrier(laneB, startZ + 6);
+
+        // Wave 2 (zPos - 3 & zPos + 5): Staggered hurdles alongside the train
+        this.spawnHighBarrier(laneA, zPos - 3);
+        this.spawnLowBarrier(laneB, zPos - 1);
+        this.spawnCoin(laneB, zPos - 1, 1.9);
+
+        this.spawnLowBarrier(laneA, zPos + 6);
+        this.spawnHighBarrier(laneB, zPos + 7);
+
+        // Wave 3 (startZ + 32): Hurdles at segment exit
+        this.spawnHighBarrier(laneA, startZ + 32);
+        this.spawnLowBarrier(laneB, startZ + 32);
+
+        this.spawnCollectiblesNear(zPos + 1, laneA);
+        return;
       }
     }
+
+    // Non-Train Triple-Wave Hurdle Gauntlet (3 dense waves of Low & High barriers every 11m!)
+    const wavePositions = [startZ + 6, startZ + 18, startZ + 30];
+    wavePositions.forEach((wZ, wIdx) => {
+      const openLane = (Math.floor(startZ / 36) + wIdx) % 3;
+      const bLane1 = (openLane + 1) % 3;
+      const bLane2 = (openLane + 2) % 3;
+
+      if (wIdx % 2 === 0) {
+        this.spawnLowBarrier(bLane1, wZ);
+        this.spawnCoin(bLane1, wZ, 1.9);
+        this.spawnHighBarrier(bLane2, wZ);
+        // Optional jumpable hurdle in the 3rd lane too!
+        if (Math.random() < 0.65) {
+          this.spawnLowBarrier(openLane, wZ + 3);
+          this.spawnCoin(openLane, wZ + 3, 1.9);
+        }
+      } else {
+        this.spawnHighBarrier(bLane1, wZ);
+        this.spawnLowBarrier(bLane2, wZ);
+        this.spawnCoin(bLane2, wZ, 1.9);
+        if (Math.random() < 0.65) {
+          this.spawnHighBarrier(openLane, wZ + 3);
+        }
+      }
+    });
+    this.spawnCollectiblesNear(zPos - 4, Math.floor(Math.random() * 3));
   }
 
   // --- Subway Train Spawner (Subway Surfers Metro Vagoni) ---
   private spawnTrain(lane: number, z: number, isMoving: boolean = false, hasRamp: boolean = false) {
+    const assets = getSharedAssets();
     const group = new THREE.Group();
     const x = LANES[lane];
     group.position.set(x, 0, z);
@@ -1298,98 +1519,62 @@ export class GameEngine {
     const trainW = 2.25;
     const trainH = 2.3;
 
-    // Train Body Palette: Subway Red (0xb91c1c), Metro Blue (0x1d4ed8), or Amber Steel (0xd97706)
-    const trainColors = [0xb91c1c, 0x1d4ed8, 0xd97706, 0x059669];
-    const trainColor = trainColors[Math.abs(lane + Math.floor(z / 40)) % trainColors.length];
+    const colorIdx = Math.abs(lane + Math.floor(z / 36)) % assets.trainBodyMats.length;
 
     // Main Wagon Body
-    const bodyGeo = new THREE.BoxGeometry(trainW, trainH, trainL);
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: trainColor,
-      roughness: 0.35,
-      metalness: 0.5,
-    });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    const body = new THREE.Mesh(assets.trainBodyGeo, assets.trainBodyMats[colorIdx]);
     body.position.y = trainH / 2 + 0.15;
     body.castShadow = this.quality === 'high';
     group.add(body);
 
     // Dark Corrugated Roof
-    const roofGeo = new THREE.BoxGeometry(trainW + 0.08, 0.18, trainL + 0.1);
-    const roofMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.6,
-      metalness: 0.4,
-    });
-    const roof = new THREE.Mesh(roofGeo, roofMat);
+    const roof = new THREE.Mesh(assets.trainRoofGeo, assets.trainRoofMat);
     roof.position.y = trainH + 0.2;
     group.add(roof);
 
     // Front Windscreen / Driver Cabin
-    const windGeo = new THREE.BoxGeometry(trainW * 0.85, 0.75, 0.1);
-    const windMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.1,
-      metalness: 0.9,
-    });
-    const windscreen = new THREE.Mesh(windGeo, windMat);
+    const windscreen = new THREE.Mesh(assets.trainWindGeo, assets.trainWindMat);
     windscreen.position.set(0, trainH * 0.7, -trainL / 2 - 0.02);
     group.add(windscreen);
 
     // Front Headlights (Bright Glowing Lights facing player)
-    const lightGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.1, 12);
-    lightGeo.rotateX(Math.PI / 2);
-    const lightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-
-    const leftLight = new THREE.Mesh(lightGeo, lightMat);
+    const leftLight = new THREE.Mesh(assets.trainLightGeo, assets.trainLightMat);
     leftLight.position.set(-0.7, 0.75, -trainL / 2 - 0.04);
     group.add(leftLight);
 
-    const rightLight = new THREE.Mesh(lightGeo, lightMat);
+    const rightLight = new THREE.Mesh(assets.trainLightGeo, assets.trainLightMat);
     rightLight.position.set(0.7, 0.75, -trainL / 2 - 0.04);
     group.add(rightLight);
 
     // Front Bumper (Yellow/Black Hazard Stripes)
-    const bumperGeo = new THREE.BoxGeometry(trainW + 0.1, 0.4, 0.2);
-    const bumperMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15,
-      roughness: 0.5,
-    });
-    const bumper = new THREE.Mesh(bumperGeo, bumperMat);
+    const bumper = new THREE.Mesh(assets.trainBumperGeo, assets.trainBumperMat);
     bumper.position.set(0, 0.28, -trainL / 2 - 0.05);
     group.add(bumper);
 
     // Side Windows (4 on each side)
-    const windowGeo = new THREE.BoxGeometry(0.08, 0.65, 1.4);
-    const windowMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 });
     for (let w = 0; w < 4; w++) {
       const wZ = -trainL / 2 + 1.8 + w * 2.5;
-      const leftW = new THREE.Mesh(windowGeo, windowMat);
+      const leftW = new THREE.Mesh(assets.trainWindowGeo, assets.trainWindowMat);
       leftW.position.set(-trainW / 2 - 0.02, trainH * 0.68, wZ);
       group.add(leftW);
 
-      const rightW = new THREE.Mesh(windowGeo, windowMat);
+      const rightW = new THREE.Mesh(assets.trainWindowGeo, assets.trainWindowMat);
       rightW.position.set(trainW / 2 + 0.02, trainH * 0.68, wZ);
       group.add(rightW);
     }
 
     // Side Racing Stripe
-    const stripeGeo = new THREE.BoxGeometry(trainW + 0.04, 0.15, trainL);
-    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    const stripe = new THREE.Mesh(assets.trainStripeGeo, assets.trainStripeMat);
     stripe.position.y = trainH * 0.42;
     group.add(stripe);
 
     // Undercarriage Train Wheels (4 wheels)
-    const wheelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.2, 12);
-    wheelGeo.rotateZ(Math.PI / 2);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
     [-trainL / 2 + 1.2, trainL / 2 - 1.2].forEach((wheelZ) => {
-      const w1 = new THREE.Mesh(wheelGeo, wheelMat);
+      const w1 = new THREE.Mesh(assets.trainWheelGeo, assets.trainWheelMat);
       w1.position.set(-trainW / 2 + 0.15, 0.28, wheelZ);
       group.add(w1);
 
-      const w2 = new THREE.Mesh(wheelGeo, wheelMat);
+      const w2 = new THREE.Mesh(assets.trainWheelGeo, assets.trainWheelMat);
       w2.position.set(trainW / 2 - 0.15, 0.28, wheelZ);
       group.add(w2);
     });
@@ -1397,33 +1582,25 @@ export class GameEngine {
     // Optional Front Ramp (Subway Surfers Red/Amber Boarding Ramp with Upward Arrow ↑ like Image 1!)
     if (hasRamp) {
       const rampGroup = new THREE.Group();
-      // Sloped ramp extending from z = -trainL/2 - 4.4 (y=0) to z = -trainL/2 (y=2.45)
-      const rampGeo = new THREE.BoxGeometry(trainW + 0.14, 0.24, 4.95);
-      const rampMat = new THREE.MeshStandardMaterial({
-        color: 0x991b1b, // Iconic Subway Surfers Crimson/Maroon Ramp Base
-        roughness: 0.55,
-      });
-      const ramp = new THREE.Mesh(rampGeo, rampMat);
+      const ramp = new THREE.Mesh(assets.rampGeo, assets.rampMat);
       ramp.position.set(0, 1.22, -trainL / 2 - 2.1);
       ramp.rotation.x = -0.525;
       rampGroup.add(ramp);
 
       // Upward Arrow (↑) Stem & Chevron painted on the Ramp Surface!
-      const arrowMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
-      const arrowStem = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.26, 2.6), arrowMat);
+      const arrowStem = new THREE.Mesh(assets.arrowStemGeo, assets.arrowMat);
       arrowStem.position.set(0, 1.24, -trainL / 2 - 2.1);
       arrowStem.rotation.x = -0.525;
       rampGroup.add(arrowStem);
 
-      const arrowHead = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.26, 0.55), arrowMat);
+      const arrowHead = new THREE.Mesh(assets.arrowHeadGeo, assets.arrowMat);
       arrowHead.position.set(0, 1.88, -trainL / 2 - 0.95);
       arrowHead.rotation.x = -0.525;
       rampGroup.add(arrowHead);
 
       // Yellow safety side rails on ramp so player clearly spots climbable trains
-      const railGeo = new THREE.BoxGeometry(0.14, 0.3, 4.95);
       [-trainW / 2, trainW / 2].forEach((rx) => {
-        const rail = new THREE.Mesh(railGeo, arrowMat);
+        const rail = new THREE.Mesh(assets.rampRailGeo, assets.arrowMat);
         rail.position.set(rx, 1.32, -trainL / 2 - 2.1);
         rail.rotation.x = -0.525;
         rampGroup.add(rail);
@@ -1431,14 +1608,20 @@ export class GameEngine {
 
       group.add(rampGroup);
 
-      // Spawn gold coins leading up the ramp and across the train roof, plus a special Gift Box / Magnet / Boost at the roof end!
+      // Spawn gold coins leading up the ramp and across the train roof, plus an occasional special pickup at the roof end!
       for (let c = 0; c < 5; c++) {
         const coinZ = z - trainL / 2 - 1.5 + c * 2.4;
         const coinY = c === 0 ? 1.35 : trainH + 0.65;
-        if (c === 4 && Math.random() < 0.55) {
-          const roofPowerups: ('box' | 'magnet' | 'boost')[] = ['box', 'magnet', 'boost'];
-          const pType = roofPowerups[Math.floor(Math.random() * roofPowerups.length)];
-          this.spawnPowerup(pType, lane, coinZ, trainH + 0.85);
+        if (c === 4 && Math.random() < 0.25) {
+          const canSpawnFlight = z >= 180 && z - this.lastFlightPowerupZ >= 320 && Math.random() < 0.18;
+          if (canSpawnFlight) {
+            this.lastFlightPowerupZ = z;
+            this.spawnPowerup(Math.random() < 0.5 ? 'jetpack' : 'hoverboard', lane, coinZ, trainH + 0.85);
+          } else {
+            const roofPowerups: ('box' | 'magnet' | 'boost' | 'sneakers')[] = ['box', 'magnet', 'boost', 'sneakers'];
+            const pType = roofPowerups[Math.floor(Math.random() * roofPowerups.length)];
+            this.spawnPowerup(pType, lane, coinZ, trainH + 0.85);
+          }
         } else {
           this.spawnCoin(lane, coinZ, coinY);
         }
@@ -1447,15 +1630,20 @@ export class GameEngine {
 
     this.scene.add(group);
 
-    const bbox = new THREE.Box3();
-    bbox.setFromObject(group);
+    this.lastAnyTrainZ = Math.max(this.lastAnyTrainZ, z);
+    this.lastTrainZByLane[lane] = Math.max(this.lastTrainZByLane[lane], z);
+
+    const bbox = new THREE.Box3(
+      new THREE.Vector3(x - trainW / 2, 0, z - trainL / 2),
+      new THREE.Vector3(x + trainW / 2, trainH + 0.3, z + trainL / 2)
+    );
 
     this.obstacles.push({
       mesh: group,
       lane,
       z,
       type: isMoving ? 'moving_train' : 'train',
-      speedZ: isMoving ? 8.5 : 0,
+      speedZ: 0,
       length: trainL,
       rampLength: hasRamp ? 4.4 : 0,
       hasRamp,
@@ -1465,46 +1653,37 @@ export class GameEngine {
   }
 
   private spawnLowBarrier(lane: number, z: number) {
+    const assets = getSharedAssets();
     const group = new THREE.Group();
     const x = LANES[lane];
     group.position.set(x, 0, z);
 
     // Hurdle barricade
-    const barGeo = new THREE.BoxGeometry(2.3, 0.42, 0.35);
-    const barMat = new THREE.MeshStandardMaterial({
-      color: 0xef4444, // Red hazard
-      roughness: 0.4,
-    });
-    const bar = new THREE.Mesh(barGeo, barMat);
+    const bar = new THREE.Mesh(assets.lowBarGeo, assets.lowBarMat);
     bar.position.y = 0.48;
     bar.castShadow = this.quality === 'high';
     group.add(bar);
 
     // Hazard yellow/black striped top
-    const topGeo = new THREE.BoxGeometry(2.35, 0.1, 0.38);
-    const topMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15,
-      emissive: 0xfacc15,
-      emissiveIntensity: 0.3,
-    });
-    const top = new THREE.Mesh(topGeo, topMat);
+    const top = new THREE.Mesh(assets.lowTopGeo, assets.lowTopMat);
     top.position.y = 0.72;
     group.add(top);
 
     // Legs
-    const legGeo = new THREE.BoxGeometry(0.2, 0.7, 0.35);
-    const leftLeg = new THREE.Mesh(legGeo, barMat);
+    const leftLeg = new THREE.Mesh(assets.lowLegGeo, assets.lowBarMat);
     leftLeg.position.set(-0.95, 0.35, 0);
     group.add(leftLeg);
 
-    const rightLeg = new THREE.Mesh(legGeo, barMat);
+    const rightLeg = new THREE.Mesh(assets.lowLegGeo, assets.lowBarMat);
     rightLeg.position.set(0.95, 0.35, 0);
     group.add(rightLeg);
 
     this.scene.add(group);
 
-    const bbox = new THREE.Box3();
-    bbox.setFromObject(group);
+    const bbox = new THREE.Box3(
+      new THREE.Vector3(x - 1.15, 0, z - 0.22),
+      new THREE.Vector3(x + 1.15, 0.78, z + 0.22)
+    );
 
     this.obstacles.push({
       mesh: group,
@@ -1517,50 +1696,37 @@ export class GameEngine {
   }
 
   private spawnHighBarrier(lane: number, z: number) {
+    const assets = getSharedAssets();
     const group = new THREE.Group();
     const x = LANES[lane];
     group.position.set(x, 0, z);
 
     // Tall side hurdle posts
-    const pillarGeo = new THREE.BoxGeometry(0.28, 2.7, 0.3);
-    const pillarMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15, // Bright athletic caution yellow
-      roughness: 0.3,
-      metalness: 0.2,
-    });
-
-    const leftP = new THREE.Mesh(pillarGeo, pillarMat);
+    const leftP = new THREE.Mesh(assets.highPillarGeo, assets.highPillarMat);
     leftP.position.set(-1.05, 1.35, 0);
     group.add(leftP);
 
-    const rightP = new THREE.Mesh(pillarGeo, pillarMat);
+    const rightP = new THREE.Mesh(assets.highPillarGeo, assets.highPillarMat);
     rightP.position.set(1.05, 1.35, 0);
     group.add(rightP);
 
     // Overhead clearance beam (bottom height ~1.2m, top height ~2.6m -> forces ducking)
-    const beamGeo = new THREE.BoxGeometry(2.4, 1.3, 0.4);
-    const beamMat = new THREE.MeshStandardMaterial({
-      color: 0xe11d48, // Rose hazard
-      emissive: 0x9f1239,
-      emissiveIntensity: 0.3,
-      roughness: 0.3,
-    });
-    const beam = new THREE.Mesh(beamGeo, beamMat);
+    const beam = new THREE.Mesh(assets.highBeamGeo, assets.highBeamMat);
     beam.position.y = 1.95;
     beam.castShadow = this.quality === 'high';
     group.add(beam);
 
     // Glowing warning sign
-    const signGeo = new THREE.PlaneGeometry(1.2, 0.4);
-    const signMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-    const sign = new THREE.Mesh(signGeo, signMat);
+    const sign = new THREE.Mesh(assets.highSignGeo, assets.highSignMat);
     sign.position.set(0, 1.95, 0.22);
     group.add(sign);
 
     this.scene.add(group);
 
-    const bbox = new THREE.Box3();
-    bbox.setFromObject(group);
+    const bbox = new THREE.Box3(
+      new THREE.Vector3(x - 1.15, 1.2, z - 0.25),
+      new THREE.Vector3(x + 1.15, 2.65, z + 0.25)
+    );
 
     this.obstacles.push({
       mesh: group,
@@ -1656,8 +1822,15 @@ export class GameEngine {
     const lane = specificLane !== undefined ? specificLane : Math.floor(Math.random() * 3);
     const rand = Math.random();
 
-    // Check if we should spawn a rare powerup or Mystery Gift Box (Sovg'a)
-    if (rand < 0.16) {
+    // Rarely spawn Jetpack or Hoverboard (only after 160m and at least 320m apart!), or standard Subway Surfers powerups!
+    if (rand < 0.14) {
+      const canSpawnFlight = z >= 160 && z - this.lastFlightPowerupZ >= 320 && Math.random() < 0.22;
+      if (canSpawnFlight) {
+        this.lastFlightPowerupZ = z;
+        this.spawnPowerup(Math.random() < 0.5 ? 'jetpack' : 'hoverboard', lane, z);
+        return;
+      }
+
       const pTypes: ('magnet' | 'shield' | 'boost' | 'sneakers' | 'box' | 'heart')[] = [
         'magnet',
         'boost',
@@ -1683,28 +1856,16 @@ export class GameEngine {
   }
 
   private spawnCoin(lane: number, z: number, y: number) {
+    const assets = getSharedAssets();
     const group = new THREE.Group();
     const x = LANES[lane];
     group.position.set(x, y, z);
 
-    // 3D Spinning Subway Star Coin
-    const coinGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.1, 16);
-    coinGeo.rotateZ(Math.PI / 2);
-    const coinMat = new THREE.MeshStandardMaterial({
-      color: 0xfbbf24, // Bright Gold
-      metalness: 0.9,
-      roughness: 0.18,
-      emissive: 0xf59e0b,
-      emissiveIntensity: 0.4,
-    });
-    const coinMesh = new THREE.Mesh(coinGeo, coinMat);
+    // 3D Spinning Subway Star Coin (using cached geometries & materials for zero lag!)
+    const coinMesh = new THREE.Mesh(assets.coinGeo, assets.coinMat);
     group.add(coinMesh);
 
-    // Embossed Star on Coin Faces
-    const starGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 5);
-    starGeo.rotateZ(Math.PI / 2);
-    const starMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-    const starMesh = new THREE.Mesh(starGeo, starMat);
+    const starMesh = new THREE.Mesh(assets.starGeo, assets.starMat);
     group.add(starMesh);
 
     this.scene.add(group);
@@ -1720,7 +1881,7 @@ export class GameEngine {
   }
 
   private spawnPowerup(
-    type: 'magnet' | 'shield' | 'boost' | 'sneakers' | 'box' | 'heart',
+    type: 'jetpack' | 'hoverboard' | 'magnet' | 'shield' | 'boost' | 'sneakers' | 'box' | 'heart',
     lane: number,
     z: number,
     y: number = 1.3
@@ -1729,7 +1890,100 @@ export class GameEngine {
     const x = LANES[lane];
     group.position.set(x, y, z);
 
-    if (type === 'magnet') {
+    if (type === 'jetpack') {
+      // Subway Surfers Iconic Twin Spray-Can Jetpack Pickup!
+      const jpPickup = new THREE.Group();
+      [-0.22, 0.22].forEach((tx, idx) => {
+        const tankColor = idx === 0 ? 0xef4444 : 0x0284c7;
+        const tank = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.16, 0.16, 0.68, 14),
+          new THREE.MeshStandardMaterial({
+            color: tankColor,
+            emissive: tankColor,
+            emissiveIntensity: 0.25,
+            roughness: 0.25,
+            metalness: 0.5,
+          })
+        );
+        tank.position.set(tx, 0.05, 0);
+        jpPickup.add(tank);
+
+        const stripe = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.168, 0.168, 0.12, 14),
+          new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+        );
+        stripe.position.set(tx, 0.08, 0);
+        jpPickup.add(stripe);
+
+        const cap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.155, 12, 12),
+          new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.15 })
+        );
+        cap.position.set(tx, 0.39, 0);
+        jpPickup.add(cap);
+
+        const flame = new THREE.Mesh(
+          new THREE.ConeGeometry(0.12, 0.36, 8),
+          new THREE.MeshBasicMaterial({ color: 0xf97316 })
+        );
+        flame.rotation.x = Math.PI;
+        flame.position.set(tx, -0.45, 0);
+        jpPickup.add(flame);
+      });
+
+      const bridgeBar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 0.22, 0.14),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7 })
+      );
+      bridgeBar.position.set(0, 0.08, 0);
+      jpPickup.add(bridgeBar);
+
+      const aura = new THREE.Mesh(
+        new THREE.TorusGeometry(0.75, 0.05, 8, 24),
+        new THREE.MeshBasicMaterial({ color: 0xf97316 })
+      );
+      jpPickup.add(aura);
+
+      group.add(jpPickup);
+    } else if (type === 'hoverboard') {
+      // Subway Surfers Iconic Neon Hoverboard Pickup!
+      const hbPickup = new THREE.Group();
+      hbPickup.rotation.x = 0.45;
+      hbPickup.rotation.z = 0.35;
+
+      const deck = new THREE.Mesh(
+        new THREE.BoxGeometry(0.56, 0.08, 1.32),
+        new THREE.MeshStandardMaterial({
+          color: 0xdc2626,
+          emissive: 0xb91c1c,
+          emissiveIntensity: 0.35,
+          roughness: 0.25,
+          metalness: 0.4,
+        })
+      );
+      hbPickup.add(deck);
+
+      const centerStripe = new THREE.Mesh(
+        new THREE.BoxGeometry(0.18, 0.09, 1.26),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+      );
+      hbPickup.add(centerStripe);
+
+      [-0.22, 0.22].forEach((rx) => {
+        const neonEdge = new THREE.Mesh(
+          new THREE.BoxGeometry(0.06, 0.09, 1.2),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+        );
+        neonEdge.position.set(rx, 0, 0);
+        hbPickup.add(neonEdge);
+      });
+
+      const aura = new THREE.Mesh(
+        new THREE.TorusGeometry(0.78, 0.05, 8, 24),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+      );
+      group.add(hbPickup, aura);
+    } else if (type === 'magnet') {
       // Subway Surfers Iconic Red & Gold Horseshoe Magnet!
       const magnetGroup = new THREE.Group();
       const arcGeo = new THREE.TorusGeometry(0.45, 0.12, 12, 24, Math.PI);
@@ -1847,6 +2101,32 @@ export class GameEngine {
     });
   }
 
+  // --- Spawn ONLY Golden Coins in the Sky Below Overhead Wires during Jetpack / Hoverboard Flight ---
+  private ensureSkyCoinsAhead() {
+    if (this.activePowerup !== 'jetpack' && this.activePowerup !== 'hoverboard') return;
+    if (this.powerupTimer <= 1.1) return;
+
+    const skyCoinY = 7.45; // Safely below overhead wires (y = 12.95) and well above trains (y = 2.45)
+
+    if (this.lastSkyCoinZ < this.playerZ + 8) {
+      this.lastSkyCoinZ = this.playerZ + 8;
+    }
+
+    while (this.lastSkyCoinZ < this.playerZ + 135) {
+      // Smoothly wave across lanes 0 -> 1 -> 2 -> 1 -> 0 so player can steer left & right in the sky!
+      const wavePattern = [1, 0, 1, 2];
+      const lane = wavePattern[this.skyCoinWaveStep % wavePattern.length];
+      this.skyCoinWaveStep++;
+
+      for (let c = 0; c < 5; c++) {
+        const coinZ = this.lastSkyCoinZ + c * 2.4;
+        this.spawnCoin(lane, coinZ, skyCoinY);
+      }
+
+      this.lastSkyCoinZ += 5 * 2.4 + 2.2;
+    }
+  }
+
   // --- Finish Line Portal (Grand Gateway of Ascension) ---
   private createFinishPortal() {
     this.finishPortal = new THREE.Group();
@@ -1947,23 +2227,69 @@ export class GameEngine {
   }
 
   // --- Player Controls (WASD / Arrows / Swipes) ---
+  private isLaneBlockedByTrainSide(lane: number, pZ: number, pY: number): boolean {
+    if (
+      this.activePowerup === 'jetpack' ||
+      this.activePowerup === 'hoverboard' ||
+      this.isOnTrainRoof ||
+      pY >= 2.05
+    ) {
+      return false;
+    }
+    const halfL = 11.5 / 2;
+    for (let i = 0; i < this.obstacles.length; i++) {
+      const obs = this.obstacles[i];
+      if ((obs.type === 'train' || obs.type === 'moving_train') && obs.lane === lane) {
+        const trainFrontZ = obs.z - halfL;
+        const trainBackZ = obs.z + halfL;
+        // If train has a front ramp and player is on/in front of the ramp, it is climbable
+        if (obs.hasRamp && pZ < trainFrontZ + 0.35) {
+          continue;
+        }
+        // Solid train side wall blocks entering the train interior from an adjacent lane!
+        if (pZ >= trainFrontZ - 0.3 && pZ <= trainBackZ - 0.35) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   public moveLeft() {
     if (this.targetLaneIndex > 0) {
+      const nextLane = this.targetLaneIndex - 1;
+      if (this.isLaneBlockedByTrainSide(nextLane, this.playerZ, this.playerY)) {
+        this.screenShakeIntensity = 0.22;
+        soundManager.playStumble();
+        this.alertPoliceChaser();
+        return;
+      }
       this.previousLaneIndex = this.targetLaneIndex;
-      this.targetLaneIndex--;
+      this.targetLaneIndex = nextLane;
       soundManager.playLaneSwitch('left');
     }
   }
 
   public moveRight() {
     if (this.targetLaneIndex < 2) {
+      const nextLane = this.targetLaneIndex + 1;
+      if (this.isLaneBlockedByTrainSide(nextLane, this.playerZ, this.playerY)) {
+        this.screenShakeIntensity = 0.22;
+        soundManager.playStumble();
+        this.alertPoliceChaser();
+        return;
+      }
       this.previousLaneIndex = this.targetLaneIndex;
-      this.targetLaneIndex++;
+      this.targetLaneIndex = nextLane;
       soundManager.playLaneSwitch('right');
     }
   }
 
   public jump() {
+    // While flying in the sky below the overhead wires, maintain stable sky altitude
+    if (this.activePowerup === 'jetpack' || this.activePowerup === 'hoverboard') {
+      return;
+    }
     if (!this.isJumping) {
       this.isJumping = true;
       this.isSliding = false;
@@ -1975,6 +2301,10 @@ export class GameEngine {
   }
 
   public slide() {
+    // While flying in the sky below the overhead wires, maintain stable sky altitude
+    if (this.activePowerup === 'jetpack' || this.activePowerup === 'hoverboard') {
+      return;
+    }
     this.isSliding = true;
     this.slideTimer = 0.75; // duration of slide
     soundManager.playSlide(this.isJumping);
@@ -2026,10 +2356,11 @@ export class GameEngine {
     }
 
     // 1. Forward Movement
-    const speedMultiplier = this.activePowerup === 'boost' ? 1.55 : 1.0;
+    const isSkyFlying = this.activePowerup === 'jetpack' || this.activePowerup === 'hoverboard';
+    const speedMultiplier = isSkyFlying ? 1.65 : this.activePowerup === 'boost' ? 1.55 : 1.0;
     const forwardStep = this.currentSpeed * speedMultiplier * dt;
     this.playerZ += forwardStep;
-    this.score += Math.round(forwardStep * this.multiplier * (this.activePowerup === 'boost' ? 2 : 1));
+    this.score += Math.round(forwardStep * this.multiplier * (isSkyFlying || this.activePowerup === 'boost' ? 2 : 1));
 
     // 2. Lane Switching (Smooth Lerp + Banking tilt)
     const targetX = LANES[this.targetLaneIndex];
@@ -2037,7 +2368,7 @@ export class GameEngine {
     this.playerX += dx * Math.min(1, 20 * dt);
 
     // Once player has settled into the target lane (or is running on a train roof), sync previousLaneIndex so player NEVER auto-shifts lanes later!
-    if (Math.abs(dx) < 0.15 || this.isOnTrainRoof) {
+    if (Math.abs(dx) < 0.15 || this.isOnTrainRoof || isSkyFlying) {
       this.previousLaneIndex = this.targetLaneIndex;
     }
 
@@ -2045,76 +2376,112 @@ export class GameEngine {
     const bankAngle = -dx * 0.18;
     this.playerBodyGroup.rotation.z = bankAngle;
 
-    // 3. Platform & Train Roof Ground Check (STRICT Subway Surfers Rule: ONLY climb via Front Ramp!)
+    // 3. Sky Flight (Jetpack / Hoverboard below overhead wires) OR Ground & Train Roof Check
     let currentGroundY = 0;
     const pZ = this.playerZ;
     const pX = this.playerX;
 
-    for (let i = 0; i < this.obstacles.length; i++) {
-      const obs = this.obstacles[i];
-      if (obs.type === 'train' || obs.type === 'moving_train') {
-        const trainX = LANES[obs.lane];
-        const halfL = 11.5 / 2;
-        const trainFrontZ = obs.z - halfL;
-        const trainBackZ = obs.z + halfL;
+    if (isSkyFlying) {
+      // Continuously spawn ONLY coins in the sky ahead of the player!
+      this.ensureSkyCoinsAhead();
 
-        // Check if player is in the train's lane
-        if (Math.abs(pX - trainX) < 1.25) {
-          // A. Climbing up the Front Ramp (ONLY if train has a ramp and player entered from the front!)
-          if (obs.hasRamp) {
-            const rampStartZ = trainFrontZ - 4.5;
-            if (pZ >= rampStartZ && pZ <= trainFrontZ + 0.4) {
-              const rampProgress = Math.max(0, Math.min(1, (pZ - rampStartZ) / 4.3));
-              const rampY = rampProgress * 2.45;
-              // Player must be within step-up height of the ramp slope (prevents climbing from the side!)
-              if (this.playerY >= rampY - 0.85 || this.isOnTrainRoof) {
-                currentGroundY = Math.max(currentGroundY, rampY);
-                if (rampProgress >= 0.65 && !this.isOnTrainRoof) {
-                  this.isOnTrainRoof = true;
-                  soundManager.playLand(true);
+      // Fly at y = 7.2: well ABOVE all trains (2.45m) & barriers (3.2m), and cleanly BELOW overhead wires (12.95m)!
+      const targetSkyY = 7.2 + Math.sin(this.runAnimTime * 0.45) * 0.16;
+      this.playerY += (targetSkyY - this.playerY) * Math.min(1, 8.5 * dt);
+      this.isJumping = false;
+      this.jumpVelocity = 0;
+      this.isSliding = false;
+      this.isOnTrainRoof = false;
+
+      // Colorful thruster / hover particle trail in the sky
+      this.jetpackTrailTimer += dt;
+      if (this.jetpackTrailTimer >= 0.045) {
+        this.jetpackTrailTimer = 0;
+        const trailColors =
+          this.activePowerup === 'jetpack'
+            ? [0xf97316, 0xfacc15, 0x38bdf8, 0xec4899]
+            : [0x38bdf8, 0xfacc15, 0x22c55e];
+        const cHex = trailColors[Math.floor(Math.random() * trailColors.length)];
+        this.triggerParticles(this.playerX, this.playerY + 0.3, this.playerZ - 0.6, 4, cHex);
+      }
+    } else {
+      for (let i = 0; i < this.obstacles.length; i++) {
+        const obs = this.obstacles[i];
+        if (obs.type === 'train' || obs.type === 'moving_train') {
+          const trainX = LANES[obs.lane];
+          const halfL = 11.5 / 2;
+          const trainFrontZ = obs.z - halfL;
+          const trainBackZ = obs.z + halfL;
+
+          // Check if player is in the train's lane
+          if (Math.abs(pX - trainX) < 1.25) {
+            // A. Climbing up the Front Ramp (if train has a ramp)
+            if (obs.hasRamp) {
+              const rampStartZ = trainFrontZ - 4.6;
+              if (pZ >= rampStartZ && pZ <= trainFrontZ + 0.6) {
+                const rampProgress = Math.max(0, Math.min(1, (pZ - rampStartZ) / 4.4));
+                const rampY = rampProgress * 2.45;
+                if (this.playerY >= rampY - 1.15 || this.isOnTrainRoof) {
+                  currentGroundY = Math.max(currentGroundY, rampY);
+                  if (rampProgress >= 0.15 && !this.isOnTrainRoof) {
+                    this.isOnTrainRoof = true;
+                    soundManager.playLand(true);
+                  }
                 }
               }
             }
-          }
 
-          // B. Running on the Train Roof (ONLY if player ALREADY climbed a ramp or jumped from another train roof!)
-          if (pZ >= trainFrontZ && pZ <= trainBackZ) {
-            if (this.isOnTrainRoof || (this.activePowerup === 'sneakers' && this.playerY >= 2.35)) {
-              this.isOnTrainRoof = true;
-              currentGroundY = 2.45;
+            // B. Running or Landing on the Train Roof (NEVER fall through the roof into the train interior!)
+            if (pZ >= trainFrontZ - 0.35 && pZ <= trainBackZ + 0.25) {
+              if (
+                this.isOnTrainRoof ||
+                this.playerY >= 2.0 ||
+                obs.hasRamp
+              ) {
+                this.isOnTrainRoof = true;
+                currentGroundY = Math.max(currentGroundY, 2.45);
+              } else if (Math.abs(pX - trainX) < 1.08 && pZ > trainFrontZ + 0.35 && pZ < trainBackZ - 0.35) {
+                // Absolute anti-clip guard: if player is ever inside the horizontal footprint of a train (e.g. after surviving a frontal hit), pop them onto the roof immediately!
+                this.isOnTrainRoof = true;
+                currentGroundY = Math.max(currentGroundY, 2.45);
+                this.playerY = Math.max(this.playerY, 2.45);
+                this.isJumping = false;
+                this.jumpVelocity = 0;
+              }
             }
           }
         }
       }
-    }
 
-    // Apply vertical physics with dynamic currentGroundY
-    if (this.isJumping) {
-      this.playerY += this.jumpVelocity * dt;
-      this.jumpVelocity -= 38 * dt; // Crisp Subway Surfers gravity
+      // Apply vertical physics with dynamic currentGroundY
+      if (this.isJumping) {
+        this.playerY += this.jumpVelocity * dt;
+        this.jumpVelocity -= 38 * dt; // Crisp Subway Surfers gravity
 
-      if (this.playerY <= currentGroundY) {
-        this.playerY = currentGroundY;
-        this.isJumping = false;
-        this.jumpVelocity = 0;
-        soundManager.playLand(this.isOnTrainRoof || currentGroundY >= 2.2);
-      }
-    } else {
-      if (this.playerY > currentGroundY) {
-        // Player running off the back of a train or stepping down
-        this.playerY -= 30 * dt;
-        if (this.playerY < currentGroundY) {
+        if (this.playerY <= currentGroundY) {
+          this.playerY = currentGroundY;
+          this.isJumping = false;
+          this.jumpVelocity = 0;
+          soundManager.playLand(this.isOnTrainRoof || currentGroundY >= 2.2);
+        }
+      } else {
+        if (this.playerY > currentGroundY) {
+          // Player descending from sky flight or running off the back of a train
+          this.playerY -= 24 * dt;
+          if (this.playerY < currentGroundY) {
+            this.playerY = currentGroundY;
+            soundManager.playLand(this.isOnTrainRoof || currentGroundY >= 2.2);
+          }
+        } else if (this.playerY < currentGroundY) {
+          // Climbing up ramp smoothly
           this.playerY = currentGroundY;
         }
-      } else if (this.playerY < currentGroundY) {
-        // Climbing up ramp smoothly
-        this.playerY = currentGroundY;
       }
-    }
 
-    // Reset isOnTrainRoof when player drops below roof level and is not on a ramp
-    if (this.playerY < 1.9 && currentGroundY < 1.9) {
-      this.isOnTrainRoof = false;
+      // Reset isOnTrainRoof when player drops below roof level and is not on a ramp
+      if (this.playerY < 1.9 && currentGroundY < 1.9) {
+        this.isOnTrainRoof = false;
+      }
     }
 
     // 4. Slide Physics & Animation
@@ -2139,15 +2506,65 @@ export class GameEngine {
     if (this.powerupTimer > 0) {
       this.powerupTimer -= dt;
       if (this.powerupTimer <= 0) {
+        const endedPowerup = this.activePowerup;
         this.activePowerup = 'none';
         this.shieldSphereMesh.visible = false;
+        if (this.hoverboardMesh) {
+          this.hoverboardMesh.visible = false;
+          this.hoverboardMesh.rotation.y = 0;
+        }
+        if (this.jetpackMesh) {
+          this.jetpackMesh.visible = false;
+        }
+        this.playerBodyGroup.rotation.y = 0;
+
+        // If descending from Jetpack or Hoverboard sky flight, clear landing zone obstacles and grant safe landing invulnerability!
+        if (endedPowerup === 'jetpack' || endedPowerup === 'hoverboard') {
+          this.invulnerableTimer = 2.0;
+          for (let i = this.obstacles.length - 1; i >= 0; i--) {
+            const obs = this.obstacles[i];
+            if (obs.z >= this.playerZ - 8 && obs.z <= this.playerZ + 32) {
+              this.scene.remove(obs.mesh);
+              this.obstacles.splice(i, 1);
+            }
+          }
+          // Remove any leftover sky coins behind/ahead after flight ends
+          for (let i = this.collectibles.length - 1; i >= 0; i--) {
+            if (this.collectibles[i].y > 5.0) {
+              this.scene.remove(this.collectibles[i].mesh);
+              this.collectibles.splice(i, 1);
+            }
+          }
+        }
       }
     }
 
-    // 7. Limb Running Animation
+    // 7. Limb Running / Jetpack Flying / Hoverboard Surfing Animation
     this.runAnimTime += dt * this.currentSpeed * 0.9;
-    if (this.isJumping) {
+    if (this.activePowerup === 'jetpack') {
+      // Superhero Jetpack Flying Pose below the overhead wires!
+      this.playerBodyGroup.rotation.y = 0;
+      this.playerBodyGroup.rotation.x = 0.85;
+      this.playerBodyGroup.position.y = 0;
+      this.leftArmGroup.rotation.x = 2.45;
+      this.rightArmGroup.rotation.x = 2.45;
+      this.leftLegGroup.rotation.x = 0.22 + Math.sin(this.runAnimTime * 1.4) * 0.12;
+      this.rightLegGroup.rotation.x = -0.22 - Math.sin(this.runAnimTime * 1.4) * 0.12;
+    } else if (this.activePowerup === 'hoverboard') {
+      // Subway Surfers Sky-Surfing Hoverboard Pose!
+      this.playerBodyGroup.rotation.y = 0.35;
+      if (this.hoverboardMesh) {
+        this.hoverboardMesh.rotation.y = -0.35;
+      }
+      this.playerBodyGroup.rotation.x = 0.08;
+      this.playerBodyGroup.position.y = Math.sin(this.runAnimTime * 0.8) * 0.04;
+      this.leftLegGroup.rotation.x = -0.26;
+      this.rightLegGroup.rotation.x = 0.26;
+      this.leftArmGroup.rotation.x = -0.65;
+      this.rightArmGroup.rotation.x = 0.65;
+    } else if (this.isJumping) {
       // Jump pose: legs tucked back, arms up
+      this.playerBodyGroup.rotation.y = 0;
       this.leftLegGroup.rotation.x = -0.7;
       this.rightLegGroup.rotation.x = -0.7;
       this.leftArmGroup.rotation.x = 0.9;
@@ -2155,6 +2572,7 @@ export class GameEngine {
       this.playerBodyGroup.rotation.x = 0.2;
     } else if (this.isSliding) {
       // Slide pose: low tilt back
+      this.playerBodyGroup.rotation.y = 0;
       this.leftLegGroup.rotation.x = 1.3;
       this.rightLegGroup.rotation.x = 1.3;
       this.leftArmGroup.rotation.x = -0.9;
@@ -2163,6 +2581,7 @@ export class GameEngine {
       this.playerBodyGroup.position.y = -0.45;
     } else {
       // Natural running stride
+      this.playerBodyGroup.rotation.y = 0;
       const stride = Math.sin(this.runAnimTime);
       this.leftLegGroup.rotation.x = stride * 0.85;
       this.rightLegGroup.rotation.x = -stride * 0.85;
@@ -2208,20 +2627,33 @@ export class GameEngine {
     // Update Chaser Position & Animation
     this.updateChaser(dt);
 
-    // Notify React HUD of latest stats
-    this.callbacks.onStatsUpdate({
-      score: this.score,
-      coins: this.coins,
-      distance: Math.round(this.playerZ),
-      health: this.health,
-      maxHealth: this.maxHealth,
-      multiplier: this.multiplier,
-      activePowerup: this.activePowerup,
-      powerupTimeRemaining: Math.max(0, this.powerupTimer),
-      stars: this.calculateStars(),
-      chaserClose: this.chaserActive && this.chaserDistance < 5.0,
-      currentBiomeName: activeBiome.name,
-    });
+    // Throttled HUD updates (10Hz for score/distance, immediate for coin/health/powerup changes) to prevent 60FPS React DOM lag!
+    this.hudUpdateTimer += dt;
+    const criticalChanged =
+      this.coins !== this.lastHudCoins ||
+      this.health !== this.lastHudHealth ||
+      this.activePowerup !== this.lastHudPowerup;
+
+    if (criticalChanged || this.hudUpdateTimer >= 0.1) {
+      this.hudUpdateTimer = 0;
+      this.lastHudCoins = this.coins;
+      this.lastHudHealth = this.health;
+      this.lastHudPowerup = this.activePowerup;
+
+      this.callbacks.onStatsUpdate({
+        score: this.score,
+        coins: this.coins,
+        distance: Math.round(this.playerZ),
+        health: this.health,
+        maxHealth: this.maxHealth,
+        multiplier: this.multiplier,
+        activePowerup: this.activePowerup,
+        powerupTimeRemaining: Math.max(0, this.powerupTimer),
+        stars: this.calculateStars(),
+        chaserClose: this.chaserActive && this.chaserDistance < 5.0,
+        currentBiomeName: activeBiome.name,
+      });
+    }
   }
 
   private calculateStars(): number {
@@ -2237,25 +2669,31 @@ export class GameEngine {
     const aspect = this.camera.aspect || 1;
     const isPortraitMobile = aspect < 1.0;
 
-    // High Subway Surfers camera looking down at tracks; tracks playerY 1:1 so jumping never pushes head to top!
+    // High Subway Surfers camera looking down at tracks; clamped below overhead wires (y = 12.95) during Jetpack/Hoverboard sky flight!
+    const isSkyFlight = this.activePowerup === 'jetpack' || this.activePowerup === 'hoverboard' || this.playerY > 3.5;
     const targetCamX = this.playerX * (isPortraitMobile ? 0.36 : 0.45);
-    const targetCamY = (isPortraitMobile ? 6.6 : 5.9) + this.playerY * 1.0;
+    const targetCamY = isSkyFlight
+      ? Math.min(11.1, (isPortraitMobile ? 3.8 : 3.4) + this.playerY * 1.0)
+      : (isPortraitMobile ? 6.6 : 5.9) + this.playerY * 1.0;
     const targetCamZ = this.playerZ - (isPortraitMobile ? 9.8 : 8.6);
 
     this.camera.position.x += (targetCamX - this.camera.position.x) * Math.min(1, 12 * dt);
-    this.camera.position.y += (targetCamY - this.camera.position.y) * Math.min(1, 25 * dt);
+    this.camera.position.y += (targetCamY - this.camera.position.y) * Math.min(1, 14 * dt);
     this.camera.position.z = targetCamZ;
 
-    // Camera LookAt rises 1:1 with playerY so player stays in lower half of screen at all times
+    // Camera LookAt rises with playerY so player stays nicely framed below the overhead wires
     const lookX = this.playerX * 0.6;
-    const lookY = 1.05 + this.playerY * 0.95;
+    const lookY = isSkyFlight ? this.playerY * 0.95 : 1.05 + this.playerY * 0.95;
     const lookZ = this.playerZ + 14;
 
     this.camera.lookAt(lookX, lookY, lookZ);
 
-    // Responsive FOV for mobile phones vs desktop + dynamic boost expansion
+    // Responsive FOV for mobile phones vs desktop + dynamic boost/flight expansion
     const baseFov = isPortraitMobile ? Math.min(82, Math.round(64 / Math.pow(aspect, 0.32))) : 64;
-    const targetFov = this.activePowerup === 'boost' ? baseFov + 10 : baseFov;
+    const targetFov =
+      this.activePowerup === 'boost' || this.activePowerup === 'jetpack' || this.activePowerup === 'hoverboard'
+        ? baseFov + 8
+        : baseFov;
     if (Math.abs(this.camera.fov - targetFov) > 0.1) {
       this.camera.fov += (targetFov - this.camera.fov) * 5 * dt;
       this.camera.updateProjectionMatrix();
@@ -2299,15 +2737,7 @@ export class GameEngine {
           (seg.rightCurb.material as THREE.MeshStandardMaterial).color.setHex(currentBiome.curbColor);
         }
 
-        // Replace old scenery with fresh biome props
-        if (seg.scenery) {
-          for (const obj of seg.scenery) {
-            seg.group.remove(obj);
-          }
-          const newScenery = this.createSceneryForSegment(currentBiome, SEGMENT_LENGTH);
-          newScenery.forEach(obj => seg.group.add(obj));
-          seg.scenery = newScenery;
-        }
+        // Reuse existing segment scenery without destroying/recreating meshes to guarantee 0ms frame spikes!
 
         // Spawn obstacles and collectibles
         if (newZ < this.finishZ) {
@@ -2345,13 +2775,20 @@ export class GameEngine {
       }
 
       // Moving Oncoming Train update (travels toward player down the tracks!)
-      if (obs.type === 'moving_train' && obs.speedZ !== undefined) {
+      if (obs.type === 'moving_train' && obs.speedZ !== undefined && obs.speedZ > 0) {
         obs.z -= obs.speedZ * dt;
         obs.mesh.position.z = obs.z;
-        obs.bbox.setFromObject(obs.mesh);
       }
 
-      // Collision Detection with Player
+      // Collision Detection with Player (Completely immune while flying on Jetpack or Hoverboard!)
+      if (
+        this.activePowerup === 'jetpack' ||
+        this.activePowerup === 'hoverboard' ||
+        this.playerY > 4.0
+      ) {
+        continue;
+      }
+
       const checkDist = obs.type === 'train' || obs.type === 'moving_train' ? 11.5 : 2.5;
       if (!obs.hit && Math.abs(obs.z - pZ) < checkDist) {
         let isColliding = false;
@@ -2364,15 +2801,14 @@ export class GameEngine {
           const trainBackZ = obs.z + halfL;
 
           if (inTrainLane) {
-            if (this.isOnTrainRoof || this.playerY >= 1.15 || pZ >= trainBackZ - 0.45) {
+            if (this.isOnTrainRoof || this.playerY >= 2.05 || pZ >= trainBackZ - 0.45) {
               // Safely running on top of the train roof or dropping straight down off the back end of the train!
               isColliding = false;
-            } else if (obs.hasRamp && pZ >= trainFrontZ - 5.0 && pZ <= trainFrontZ + 0.6) {
+            } else if (obs.hasRamp && pZ >= trainFrontZ - 5.2 && pZ <= trainFrontZ + 0.8) {
               // Climbing up the front ramp — 100% safe!
               isColliding = false;
             } else if (pZ + 0.38 >= trainFrontZ && pZ < trainBackZ - 0.45) {
-              // Player is on the ground (not on roof) and hit the train!
-              // ONLY bounce back if player is actively mid-swipe into the side of the train from an adjacent lane!
+              // Player is below roof height (on ground or normal jump < 2.05m) and hit the train!
               const isActivelySwipingIn =
                 Math.abs(this.playerX - trainX) > 0.22 &&
                 this.targetLaneIndex === obs.lane &&
@@ -2380,6 +2816,7 @@ export class GameEngine {
 
               if (pZ > trainFrontZ + 0.45 && isActivelySwipingIn) {
                 this.targetLaneIndex = this.previousLaneIndex;
+                this.playerX = LANES[this.previousLaneIndex] * 0.65 + this.playerX * 0.35;
                 this.screenShakeIntensity = 0.25;
                 soundManager.playStumble();
                 this.alertPoliceChaser();
@@ -2391,8 +2828,10 @@ export class GameEngine {
             }
           }
         } else {
-          // Standard barrier / block bounding box check
-          obs.bbox.setFromObject(obs.mesh);
+          // Standard barrier / block bounding box check (bbox already precomputed on spawn)
+          if (obs.type === 'moving') {
+            obs.bbox.setFromObject(obs.mesh);
+          }
           isColliding = this.playerBox.intersectsBox(obs.bbox);
 
           if (obs.type === 'high' && this.isSliding) {
@@ -2406,6 +2845,13 @@ export class GameEngine {
 
         if (isColliding) {
           this.handleObstacleHit(obs);
+          // If the player collided with a train and survived (e.g. had hearts remaining or shield), lift onto the roof so they NEVER phase inside the train!
+          if ((obs.type === 'train' || obs.type === 'moving_train') && !this.isGameOverState) {
+            this.isOnTrainRoof = true;
+            this.playerY = 2.45;
+            this.isJumping = false;
+            this.jumpVelocity = 0;
+          }
         }
       }
     }
@@ -2490,7 +2936,7 @@ export class GameEngine {
       const dZ = Math.abs(item.z - pZ);
       const dY = Math.abs(item.y - this.playerY);
 
-      if (dX < 1.1 && dZ < 1.3 && dY < 1.8) {
+      if (dX < 1.25 && dZ < 1.55 && dY < 2.2) {
         this.collectItem(item);
       }
     }
@@ -2508,7 +2954,27 @@ export class GameEngine {
       this.coins++;
       this.score += 50 * this.multiplier;
       soundManager.playCoin();
-      this.triggerParticles(item.mesh.position.x, 1.0, item.z, 8, 0xfbbf24);
+      this.triggerParticles(item.mesh.position.x, this.playerY + 0.8, item.z, 8, 0xfbbf24);
+    } else if (item.type === 'jetpack') {
+      this.activePowerup = 'jetpack';
+      this.powerupTimer = 12;
+      if (this.jetpackMesh) this.jetpackMesh.visible = true;
+      if (this.hoverboardMesh) this.hoverboardMesh.visible = false;
+      this.shieldSphereMesh.visible = false;
+      this.lastSkyCoinZ = Math.max(this.lastSkyCoinZ, this.playerZ + 10);
+      this.ensureSkyCoinsAhead();
+      soundManager.playJetpackPickup();
+      this.triggerParticles(item.mesh.position.x, this.playerY + 1.2, item.z, 26, 0xf97316);
+    } else if (item.type === 'hoverboard') {
+      this.activePowerup = 'hoverboard';
+      this.powerupTimer = 12;
+      if (this.hoverboardMesh) this.hoverboardMesh.visible = true;
+      if (this.jetpackMesh) this.jetpackMesh.visible = false;
+      this.shieldSphereMesh.visible = false;
+      this.lastSkyCoinZ = Math.max(this.lastSkyCoinZ, this.playerZ + 10);
+      this.ensureSkyCoinsAhead();
+      soundManager.playHoverboardPickup();
+      this.triggerParticles(item.mesh.position.x, this.playerY + 1.2, item.z, 26, 0x38bdf8);
     } else if (item.type === 'magnet') {
       this.activePowerup = 'magnet';
       this.powerupTimer = 10;
