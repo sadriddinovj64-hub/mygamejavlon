@@ -714,6 +714,8 @@ interface GameOverScreenProps {
   levelConfig: LevelConfig;
   stats: PlayerStats;
   isNewHigh: boolean;
+  mysteryBoxCoinsWon?: number;
+  mysteryBoxesOpened?: number;
   onRestart: () => void;
   onOpenShop?: () => void;
   onOpenLevelSelect?: () => void;
@@ -722,6 +724,8 @@ interface GameOverScreenProps {
 export const GameOverScreen: React.FC<GameOverScreenProps> = ({
   stats,
   isNewHigh,
+  mysteryBoxCoinsWon,
+  mysteryBoxesOpened,
   onRestart,
   onOpenShop,
 }) => {
@@ -768,6 +772,19 @@ export const GameOverScreen: React.FC<GameOverScreenProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Mystery Box Extra Rewards Banner */}
+        {Boolean(mysteryBoxCoinsWon && mysteryBoxCoinsWon > 0) && (
+          <div className="w-full -mt-2 mb-4 bg-gradient-to-r from-rose-50 via-amber-50 to-yellow-50 border-2 border-amber-400 rounded-xl px-3 py-2 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-1.5 text-xs font-black text-amber-900">
+              <span>🎁</span>
+              <span>Sovg‘a qutisidan ({mysteryBoxesOpened} ta):</span>
+            </div>
+            <span className="font-mono font-black text-amber-700 text-sm">
+              +{mysteryBoxCoinsWon} 🪙
+            </span>
+          </div>
+        )}
 
         {/* Subway Surfers Blue & Green Action Buttons (Matching Image 4) */}
         <div className="flex flex-col gap-3 w-full">

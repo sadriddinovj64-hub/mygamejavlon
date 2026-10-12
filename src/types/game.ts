@@ -54,6 +54,7 @@ export interface PlayerStats {
   stars: number;
   chaserClose: boolean;
   currentBiomeName: string;
+  mysteryBoxesCollected?: number;
 }
 
 export interface GameSettings {
@@ -69,6 +70,7 @@ export interface SavedLevelData {
   highScore: number;
   bestDistance: number;
   totalCoins: number;
+  hoverboards?: number;
   levelStars: Record<number, number>; // level -> stars (1-3)
   levelScores: Record<number, number>; // level -> best score
   selectedCharacterId: string;

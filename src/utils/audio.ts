@@ -587,6 +587,102 @@ class SoundEngine {
   }
 
   /**
+   * Mystery Box Opening Sound ("Sovg'a qutisini bosib ochganda jarangdor bayramona fanfare va tangalar yog'dusi!")
+   */
+  public playMysteryBoxOpen() {
+    this.initContext();
+    if (!this.ctx || !this.sfxGain || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+
+    // 1. Box Crack / Unwrapping Pop
+    const pop = this.ctx.createOscillator();
+    const pGain = this.ctx.createGain();
+    pop.type = 'triangle';
+    pop.frequency.setValueAtTime(160, t);
+    pop.frequency.exponentialRampToValueAtTime(720, t + 0.1);
+    pGain.gain.setValueAtTime(0.5, t);
+    pGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    pop.connect(pGain);
+    pGain.connect(this.sfxGain);
+    pop.start(t);
+    pop.stop(t + 0.12);
+
+    // 2. Sparkling Golden Arpeggio (C5 -> E5 -> G5 -> C6 -> E6 -> G6 -> C7)
+    const openNotes = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
+    openNotes.forEach((freq, idx) => {
+      if (!this.ctx || !this.sfxGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      const start = t + 0.08 + idx * 0.055;
+      const dur = idx === openNotes.length - 1 ? 0.65 : 0.22;
+
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.42, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(start);
+      osc.stop(start + dur);
+    });
+
+    // 3. Rushing Coins Cascade
+    for (let c = 0; c < 6; c++) {
+      const cOsc = this.ctx.createOscillator();
+      const cGain = this.ctx.createGain();
+      cOsc.type = 'sine';
+      const cStart = t + 0.35 + c * 0.07;
+      const cFreq = 1600 + Math.random() * 800;
+      cOsc.frequency.setValueAtTime(cFreq, cStart);
+      cOsc.frequency.exponentialRampToValueAtTime(cFreq * 1.5, cStart + 0.06);
+
+      cGain.gain.setValueAtTime(0.28, cStart);
+      cGain.gain.exponentialRampToValueAtTime(0.001, cStart + 0.07);
+
+      cOsc.connect(cGain);
+      cGain.connect(this.sfxGain);
+      cOsc.start(cStart);
+      cOsc.stop(cStart + 0.07);
+    }
+  }
+
+  /**
+   * Super Jackpot celebration fanfare
+   */
+  public playJackpot() {
+    this.initContext();
+    if (!this.ctx || !this.sfxGain || this.isMuted) return;
+
+    const t = this.ctx.currentTime;
+    const chords = [
+      [523.25, 659.25, 783.99],   // C Major
+      [587.33, 739.99, 880.0],    // D Major
+      [659.25, 830.61, 987.77],   // E Major
+      [1046.5, 1318.51, 1567.98], // High C Major
+    ];
+
+    chords.forEach((chord, cIdx) => {
+      const cStart = t + cIdx * 0.16;
+      const cDur = cIdx === chords.length - 1 ? 0.8 : 0.22;
+      chord.forEach((freq) => {
+        if (!this.ctx || !this.sfxGain) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, cStart);
+        gain.gain.setValueAtTime(0.32, cStart);
+        gain.gain.exponentialRampToValueAtTime(0.001, cStart + cDur);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(cStart);
+        osc.stop(cStart + cDur);
+      });
+    });
+  }
+
+  /**
    * Shield Forcefield Pickup Sound
    */
   public playShieldPickup() {

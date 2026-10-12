@@ -10,6 +10,7 @@ interface HUDProps {
   onPause: () => void;
   onOpenShop?: () => void;
   onToggleSound?: () => void;
+  onActivateHoverboard?: () => void;
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -19,6 +20,7 @@ export const HUD: React.FC<HUDProps> = ({
   onPause,
   onOpenShop,
   onToggleSound,
+  onActivateHoverboard,
 }) => {
   const paddedScore = String(Math.floor(stats.score)).padStart(6, '0');
   const totalBars = 10;
@@ -111,7 +113,17 @@ export const HUD: React.FC<HUDProps> = ({
             </div>
           </div>
 
-          {/* 3. TOP RUN / HIGH SCORE Box (Matching Images 1, 2, 3, 5) */}
+          {/* 2b. Mystery Boxes Badge (when collected in current run) */}
+          {Boolean(stats.mysteryBoxesCollected && stats.mysteryBoxesCollected > 0) && (
+            <div className="flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-amber-600 px-3 py-1 rounded-xl border border-yellow-300/70 shadow-lg animate-bounce">
+              <span className="text-sm">🎁</span>
+              <span className="font-mono font-black text-white text-xs sm:text-sm drop-shadow">
+                x{stats.mysteryBoxesCollected}
+              </span>
+            </div>
+          )}
+
+          {/* 3. TOP RUN / HIGH SCORE Box */}
           <div className="flex flex-col items-center bg-slate-950/65 backdrop-blur-sm px-2.5 py-1.5 rounded-xl border border-white/15 shadow-md">
             <span className="text-[9px] font-black uppercase tracking-wider text-yellow-400 leading-none mb-1">
               TOP RUN
@@ -126,10 +138,10 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       </div>
 
-      {/* BOTTOM-LEFT: Subway Surfers Segmented Powerup Timer Bar (Matching Image 1 & Image 5) */}
-      <div className="w-full flex items-end justify-between">
+      {/* BOTTOM BAR: Subway Surfers Segmented Powerup Timer Bar + Double-Tap Hoverboard Quick Icon */}
+      <div className="w-full flex items-end justify-between pointer-events-none">
         {stats.activePowerup !== 'none' ? (
-          <div className="flex items-center gap-1.5 bg-white/95 p-1 rounded-xl border-2 border-slate-800 shadow-xl">
+          <div className="flex items-center gap-1.5 bg-white/95 p-1 rounded-xl border-2 border-slate-800 shadow-xl pointer-events-auto">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-b from-amber-400 to-orange-500 border border-amber-200 flex items-center justify-center text-white shadow">
               {stats.activePowerup === 'jetpack' && <Rocket className="w-5 h-5 text-white" />}
               {stats.activePowerup === 'hoverboard' && <Flame className="w-5 h-5 text-white fill-white" />}
@@ -159,6 +171,18 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         ) : (
           <div />
+        )}
+
+        {/* Quick Hoverboard Activation Button (Subway Surfers signature skateboard) */}
+        {onActivateHoverboard && stats.activePowerup !== 'hoverboard' && stats.activePowerup !== 'jetpack' && (
+          <button
+            onClick={onActivateHoverboard}
+            className="pointer-events-auto flex items-center gap-1.5 px-3 py-2 bg-gradient-to-b from-sky-400 to-blue-600 hover:from-sky-300 hover:to-blue-500 text-white font-black text-xs rounded-2xl border-2 border-white shadow-[0_4px_0_#1e3a8a,0_8px_20px_rgba(56,189,248,0.5)] active:scale-95 transition cursor-pointer animate-pulse"
+            title="Hoverboard chaqirish (2 marta bosing yoki Probeldan foydalaning)"
+          >
+            <Flame className="w-4 h-4 fill-amber-300 text-amber-200" />
+            <span className="hidden sm:inline">HOVERBOARD</span>
+          </button>
         )}
       </div>
     </div>

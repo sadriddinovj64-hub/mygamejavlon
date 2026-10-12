@@ -12,6 +12,7 @@ import {
   PauseScreen,
   GameOverScreen,
 } from './components/Screens';
+import { MysteryBoxModal } from './components/MysteryBoxModal';
 
 const LOCAL_STORAGE_KEY = 'apex_runner_3d_save_v1';
 const SETTINGS_STORAGE_KEY = 'apex_runner_3d_settings_v1';
@@ -101,6 +102,11 @@ export default function App() {
   const [isNewHigh, setIsNewHigh] = useState<boolean>(false);
   const [showIntro, setShowIntro] = useState<boolean>(true);
 
+  // Mystery Boxes State (Subway Surfers Sovg'a Qutisi)
+  const [pendingMysteryBoxes, setPendingMysteryBoxes] = useState<number>(0);
+  const [mysteryBoxCoinsWon, setMysteryBoxCoinsWon] = useState<number>(0);
+  const [mysteryBoxesOpened, setMysteryBoxesOpened] = useState<number>(0);
+
   // Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isShopOpen, setIsShopOpen] = useState<boolean>(false);
@@ -154,6 +160,18 @@ export default function App() {
         bestDistance: newBestDist,
         totalCoins: savedData.totalCoins + finalStats.coins,
       });
+
+      // If mystery boxes were collected during the run, prepare them to open!
+      const boxes = finalStats.mysteryBoxesCollected || 0;
+      if (boxes > 0) {
+        setPendingMysteryBoxes(boxes);
+        setMysteryBoxCoinsWon(0);
+        setMysteryBoxesOpened(0);
+      } else {
+        setPendingMysteryBoxes(0);
+        setMysteryBoxCoinsWon(0);
+        setMysteryBoxesOpened(0);
+      }
 
       setGameState('GAMEOVER');
     },
@@ -289,6 +307,9 @@ export default function App() {
 
   // Start Playing
   const handleStartGame = () => {
+    setPendingMysteryBoxes(0);
+    setMysteryBoxCoinsWon(0);
+    setMysteryBoxesOpened(0);
     setGameState('PLAYING');
     startOrRestartEngine(false);
     soundManager.stopMusic();
@@ -311,6 +332,9 @@ export default function App() {
 
   // Restart Run
   const handleRestartLevel = () => {
+    setPendingMysteryBoxes(0);
+    setMysteryBoxCoinsWon(0);
+    setMysteryBoxesOpened(0);
     setGameState('PLAYING');
     startOrRestartEngine(false);
   };
@@ -331,6 +355,13 @@ export default function App() {
       const code = e.code;
       const key = e.key ? e.key.toLowerCase() : '';
 
+      // Space / KeyH: Activate Hoverboard! (Signature Subway Surfers feature)
+      if (code === 'Space' || code === 'KeyH' || key === ' ' || key === 'h' || key === 'р') {
+        e.preventDefault();
+        engineRef.current.activateHoverboard();
+        return;
+      }
+
       // Chap (Left: ArrowLeft or A)
       if (code === 'KeyA' || code === 'ArrowLeft' || key === 'a' || key === 'arrowleft' || key === 'ф') {
         e.preventDefault();
@@ -341,8 +372,8 @@ export default function App() {
         e.preventDefault();
         engineRef.current.moveRight();
       }
-      // Tepa: Sakrash (Jump: ArrowUp, W, or Space)
-      else if (code === 'KeyW' || code === 'ArrowUp' || code === 'Space' || key === 'w' || key === 'arrowup' || key === ' ' || key === 'ц') {
+      // Tepa: Sakrash (Jump: ArrowUp or W)
+      else if (code === 'KeyW' || code === 'ArrowUp' || key === 'w' || key === 'arrowup' || key === 'ц') {
         e.preventDefault();
         engineRef.current.jump();
       }
@@ -358,6 +389,9 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [gameState]);
+
+  // Double tap tracker for mobile screen hoverboard summoning (Subway Surfers signature mechanic)
+  const lastTapTimeRef = useRef<number>(0);
 
   // Execute directional swipe action
   const executeSwipeDelta = (dx: number, dy: number): boolean => {
@@ -379,9 +413,18 @@ export default function App() {
     return false;
   };
 
-  // Instant Touch Swipe Handlers for Mobile Phones (Subway Surfers 1:1)
+  // Instant Touch Swipe & Double-Tap Handlers for Mobile Phones (Subway Surfers 1:1)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length > 0) {
+      const now = Date.now();
+      if (now - lastTapTimeRef.current < 280) {
+        // Double tap detected! Summon Hoverboard
+        engineRef.current?.activateHoverboard();
+        lastTapTimeRef.current = 0;
+      } else {
+        lastTapTimeRef.current = now;
+      }
+
       touchStartRef.current = {
         x: e.touches[0].clientX,
         y: e.touches[0].clientY,
@@ -412,6 +455,13 @@ export default function App() {
   // Mouse drag swipe fallback for desktop touchpads/screens
   const handleMouseDown = (e: React.MouseEvent) => {
     if (gameState !== 'PLAYING') return;
+    const now = Date.now();
+    if (now - lastTapTimeRef.current < 280) {
+      engineRef.current?.activateHoverboard();
+      lastTapTimeRef.current = 0;
+    } else {
+      lastTapTimeRef.current = now;
+    }
     touchStartRef.current = { x: e.clientX, y: e.clientY, swiped: false };
   };
 
@@ -466,6 +516,7 @@ export default function App() {
               return { ...s, soundEnabled: next, musicEnabled: next };
             })
           }
+          onActivateHoverboard={() => engineRef.current?.activateHoverboard()}
         />
       )}
 
@@ -502,8 +553,27 @@ export default function App() {
           levelConfig={levelConfig}
           stats={stats}
           isNewHigh={isNewHigh}
+          mysteryBoxCoinsWon={mysteryBoxCoinsWon}
+          mysteryBoxesOpened={mysteryBoxesOpened}
           onRestart={handleRestartLevel}
           onOpenShop={() => setIsShopOpen(true)}
+        />
+      )}
+
+      {/* Mystery Box Opening Screen (Authentic Subway Surfers gift box opening after dying!) */}
+      {pendingMysteryBoxes > 0 && (
+        <MysteryBoxModal
+          totalBoxes={pendingMysteryBoxes}
+          onFinished={(coinsWon, hoverboardsWon) => {
+            setMysteryBoxCoinsWon(coinsWon);
+            setMysteryBoxesOpened(pendingMysteryBoxes);
+            setPendingMysteryBoxes(0);
+            saveProgress({
+              ...savedData,
+              totalCoins: savedData.totalCoins + coinsWon,
+              hoverboards: (savedData.hoverboards || 3) + hoverboardsWon,
+            });
+          }}
         />
       )}
 

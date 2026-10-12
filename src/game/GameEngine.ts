@@ -218,10 +218,13 @@ export class GameEngine {
   private lastAnyTrainZ: number = -999;
   private lastTrainZByLane: [number, number, number] = [-999, -999, -999];
   private lastFlightPowerupZ: number = 0;
+  private lastMysteryBoxZ: number = -999;
+  private mysteryBoxesCollected: number = 0;
   private hudUpdateTimer: number = 0;
   private lastHudCoins: number = -1;
   private lastHudHealth: number = -1;
   private lastHudPowerup: PowerupType = 'none';
+  private lastHudMysteryBoxes: number = -1;
 
   // Gameplay State
   private health: number = 3;
@@ -882,16 +885,13 @@ export class GameEngine {
       const z = i * SEGMENT_LENGTH;
       this.createRoadSegment(z);
       if (i === 0) {
-        // Spawn starter coins and immediate introductory hurdles right on the first segment!
+        // Starter coins on the open track and a gentle introductory hurdle
         for (let c = 0; c < 4; c++) {
-          this.spawnCoin(1, 9 + c * 2.8, 0.9);
+          this.spawnCoin(1, 9 + c * 3, 0.9);
         }
-        this.spawnLowBarrier(0, 18);
-        this.spawnHighBarrier(2, 18);
-        this.spawnLowBarrier(1, 26);
-        this.spawnCoin(1, 26, 1.9);
-        this.spawnHighBarrier(0, 32);
-        this.spawnLowBarrier(2, 32);
+        this.spawnLowBarrier(0, 24);
+        this.spawnCoin(0, 24, 1.9);
+        this.spawnHighBarrier(2, 32);
       } else {
         this.populateSegment(z);
       }
@@ -1398,13 +1398,13 @@ export class GameEngine {
     const rand = Math.random();
     const canPlaceTrainHere = startZ >= 36 && zPos - this.lastAnyTrainZ >= 34;
 
-    // High train frequency (78% of segments have trains!), plus dense multi-wave hurdles in the ground lanes!
-    if (canPlaceTrainHere && rand < 0.78) {
+    // Authentic Subway Surfers tempo: 70% of segments feature trains, 30% feature clean hurdle pairs
+    if (canPlaceTrainHere && rand < 0.70) {
       // Find candidate lanes that did NOT have a train in the previous segment
       const availableLanes = [0, 1, 2].filter((l) => this.canSpawnTrainAt(l, zPos));
 
-      if (availableLanes.length >= 2 && Math.random() < 0.58) {
-        // Pattern 1: Climbable Train with Front Ramp + Adjacent Ramp-less Train at the same Z + Action-packed Ground Lane with Hurdles!
+      if (availableLanes.length >= 2 && Math.random() < 0.55) {
+        // Pattern 1: Dual Train Pass (1 with Ramp, 1 without Ramp) + 1 Open Ground Lane with an optional jump hurdle
         const rampTrainLane = availableLanes[Math.floor(Math.random() * availableLanes.length)];
         const secondCandidates = availableLanes.filter((l) => l !== rampTrainLane);
         const noRampTrainLane = secondCandidates[Math.floor(Math.random() * secondCandidates.length)];
@@ -1416,39 +1416,17 @@ export class GameEngine {
           this.spawnCoin(noRampTrainLane, zPos - 3.5 + c * 2.2, 3.05);
         }
 
-        // Pre-train & Mid-lane hurdles in the ground lane so the player jumps/slides through obstacles!
-        if (Math.random() < 0.5) {
-          this.spawnLowBarrier(openLane, startZ + 6);
-          this.spawnCoin(openLane, startZ + 6, 1.9);
-        } else {
-          this.spawnHighBarrier(openLane, startZ + 6);
-          this.spawnCoin(openLane, startZ + 6, 0.9);
-        }
-
-        if (Math.random() < 0.55) {
-          this.spawnHighBarrier(openLane, zPos - 2);
-          this.spawnLowBarrier(openLane, zPos + 7);
-          this.spawnCoin(openLane, zPos + 7, 1.9);
-        } else {
-          this.spawnLowBarrier(openLane, zPos - 2);
-          this.spawnCoin(openLane, zPos - 2, 1.9);
-          this.spawnHighBarrier(openLane, zPos + 7);
-        }
-
-        // Post-train hurdle in the open lane at the end of the segment
-        if (Math.random() < 0.5) {
-          this.spawnLowBarrier(openLane, startZ + 32);
-        } else {
-          this.spawnHighBarrier(openLane, startZ + 32);
-        }
-        this.spawnCollectiblesNear(zPos + 1, openLane);
+        // Moderate hurdle in the ground lane: 1 low jump hurdle with coin arc
+        this.spawnLowBarrier(openLane, zPos);
+        this.spawnCoin(openLane, zPos, 1.9);
+        this.spawnCollectiblesNear(zPos - 5, openLane);
         return;
       } else if (availableLanes.length >= 1) {
-        // Pattern 2: Train + Dense Multi-Wave Hurdles across the 2 Ground Lanes!
+        // Pattern 2: 1 Train + 2 Ground Lanes (1 hurdle + 1 open lane with coins)
         const trainLane = availableLanes[Math.floor(Math.random() * availableLanes.length)];
         const otherLanes = [0, 1, 2].filter((l) => l !== trainLane);
-        const laneA = otherLanes[0];
-        const laneB = otherLanes[1];
+        const hurdleLane = otherLanes[0];
+        const openLane = otherLanes[1];
 
         const hasRamp = Math.random() < 0.75;
         this.spawnTrain(trainLane, zPos, false, hasRamp);
@@ -1458,54 +1436,52 @@ export class GameEngine {
           }
         }
 
-        // Wave 1 (startZ + 6): Hurdles in both ground lanes
-        this.spawnLowBarrier(laneA, startZ + 6);
-        this.spawnCoin(laneA, startZ + 6, 1.9);
-        this.spawnHighBarrier(laneB, startZ + 6);
+        // Moderate hurdle encounter alongside train: exactly 1 low hurdle or high barrier in hurdleLane
+        if (Math.random() < 0.6) {
+          this.spawnLowBarrier(hurdleLane, zPos);
+          this.spawnCoin(hurdleLane, zPos, 1.9);
+        } else {
+          this.spawnHighBarrier(hurdleLane, zPos);
+        }
 
-        // Wave 2 (zPos - 3 & zPos + 5): Staggered hurdles alongside the train
-        this.spawnHighBarrier(laneA, zPos - 3);
-        this.spawnLowBarrier(laneB, zPos - 1);
-        this.spawnCoin(laneB, zPos - 1, 1.9);
-
-        this.spawnLowBarrier(laneA, zPos + 6);
-        this.spawnHighBarrier(laneB, zPos + 7);
-
-        // Wave 3 (startZ + 32): Hurdles at segment exit
-        this.spawnHighBarrier(laneA, startZ + 32);
-        this.spawnLowBarrier(laneB, startZ + 32);
-
-        this.spawnCollectiblesNear(zPos + 1, laneA);
+        // Open lane has clean coins
+        this.spawnCollectiblesNear(zPos - 3, openLane);
         return;
       }
     }
 
-    // Non-Train Triple-Wave Hurdle Gauntlet (3 dense waves of Low & High barriers every 11m!)
-    const wavePositions = [startZ + 6, startZ + 18, startZ + 30];
-    wavePositions.forEach((wZ, wIdx) => {
-      const openLane = (Math.floor(startZ / 36) + wIdx) % 3;
-      const bLane1 = (openLane + 1) % 3;
-      const bLane2 = (openLane + 2) % 3;
+    // Pattern 3 (Non-Train Segments): 2 clean, rhythmic hurdle waves spaced ~16m apart (Subway Surfers signature tempo!)
+    // Wave 1 at startZ + 10:
+    const wave1Lane = Math.floor(Math.random() * 3);
+    const wave1Open1 = (wave1Lane + 1) % 3;
+    const wave1Open2 = (wave1Lane + 2) % 3;
 
-      if (wIdx % 2 === 0) {
-        this.spawnLowBarrier(bLane1, wZ);
-        this.spawnCoin(bLane1, wZ, 1.9);
-        this.spawnHighBarrier(bLane2, wZ);
-        // Optional jumpable hurdle in the 3rd lane too!
-        if (Math.random() < 0.65) {
-          this.spawnLowBarrier(openLane, wZ + 3);
-          this.spawnCoin(openLane, wZ + 3, 1.9);
-        }
-      } else {
-        this.spawnHighBarrier(bLane1, wZ);
-        this.spawnLowBarrier(bLane2, wZ);
-        this.spawnCoin(bLane2, wZ, 1.9);
-        if (Math.random() < 0.65) {
-          this.spawnHighBarrier(openLane, wZ + 3);
-        }
+    if (Math.random() < 0.5) {
+      this.spawnLowBarrier(wave1Lane, startZ + 10);
+      this.spawnCoin(wave1Lane, startZ + 10, 1.9);
+      if (Math.random() < 0.4) {
+        this.spawnHighBarrier(wave1Open1, startZ + 10);
       }
-    });
-    this.spawnCollectiblesNear(zPos - 4, Math.floor(Math.random() * 3));
+    } else {
+      this.spawnHighBarrier(wave1Lane, startZ + 10);
+      if (Math.random() < 0.4) {
+        this.spawnLowBarrier(wave1Open1, startZ + 10);
+        this.spawnCoin(wave1Open1, startZ + 10, 1.9);
+      }
+    }
+    this.spawnCollectiblesNear(startZ + 10, wave1Open2);
+
+    // Wave 2 at startZ + 26 (~16m later, smooth and predictable):
+    const wave2Lane = (wave1Lane + (Math.random() < 0.5 ? 1 : 2)) % 3;
+    const wave2Open = (wave2Lane + 1) % 3;
+
+    if (Math.random() < 0.55) {
+      this.spawnLowBarrier(wave2Lane, startZ + 26);
+      this.spawnCoin(wave2Lane, startZ + 26, 1.9);
+    } else {
+      this.spawnHighBarrier(wave2Lane, startZ + 26);
+    }
+    this.spawnCollectiblesNear(startZ + 26, wave2Open);
   }
 
   // --- Subway Train Spawner (Subway Surfers Metro Vagoni) ---
@@ -1822,6 +1798,14 @@ export class GameEngine {
     const lane = specificLane !== undefined ? specificLane : Math.floor(Math.random() * 3);
     const rand = Math.random();
 
+    // Rare Mystery Gift Box ("Sovg'a quti kam chiqsin" - authentic rare Subway Surfers collectible!)
+    const canSpawnMysteryBox = z >= 150 && z - this.lastMysteryBoxZ >= 380 && Math.random() < 0.22;
+    if (canSpawnMysteryBox) {
+      this.lastMysteryBoxZ = z;
+      this.spawnPowerup('box', lane, z, 1.25);
+      return;
+    }
+
     // Rarely spawn Jetpack or Hoverboard (only after 160m and at least 320m apart!), or standard Subway Surfers powerups!
     if (rand < 0.14) {
       const canSpawnFlight = z >= 160 && z - this.lastFlightPowerupZ >= 320 && Math.random() < 0.22;
@@ -1831,10 +1815,9 @@ export class GameEngine {
         return;
       }
 
-      const pTypes: ('magnet' | 'shield' | 'boost' | 'sneakers' | 'box' | 'heart')[] = [
+      const pTypes: ('magnet' | 'shield' | 'boost' | 'sneakers' | 'heart')[] = [
         'magnet',
         'boost',
-        'box',
         'shield',
         'sneakers',
       ];
@@ -2315,6 +2298,20 @@ export class GameEngine {
     }
   }
 
+  // Double-tap or Space / dedicated trigger to activate Hoverboard! (Signature Subway Surfers feature)
+  public activateHoverboard() {
+    if (this.isGameOverState || this.isPaused || this.isLobbyMode) return;
+    if (this.activePowerup === 'jetpack' || this.activePowerup === 'hoverboard') return;
+
+    this.activePowerup = 'hoverboard';
+    this.powerupTimer = 30; // 30 seconds authentic Subway Surfers hoverboard surfing!
+    if (this.hoverboardMesh) this.hoverboardMesh.visible = true;
+    if (this.jetpackMesh) this.jetpackMesh.visible = false;
+    this.shieldSphereMesh.visible = false;
+    soundManager.playHoverboardPickup();
+    this.triggerParticles(this.playerX, this.playerY + 0.2, this.playerZ, 30, 0x38bdf8);
+  }
+
   // --- Main Animation & Physics Loop ---
   private animate = () => {
     if (this.isDestroyed) return;
@@ -2356,7 +2353,7 @@ export class GameEngine {
     }
 
     // 1. Forward Movement
-    const isSkyFlying = this.activePowerup === 'jetpack' || this.activePowerup === 'hoverboard';
+    const isSkyFlying = this.activePowerup === 'jetpack';
     const speedMultiplier = isSkyFlying ? 1.65 : this.activePowerup === 'boost' ? 1.55 : 1.0;
     const forwardStep = this.currentSpeed * speedMultiplier * dt;
     this.playerZ += forwardStep;
@@ -2376,7 +2373,7 @@ export class GameEngine {
     const bankAngle = -dx * 0.18;
     this.playerBodyGroup.rotation.z = bankAngle;
 
-    // 3. Sky Flight (Jetpack / Hoverboard below overhead wires) OR Ground & Train Roof Check
+    // 3. Sky Flight (Jetpack below overhead wires) OR Ground & Train Roof Check
     let currentGroundY = 0;
     const pZ = this.playerZ;
     const pX = this.playerX;
@@ -2393,14 +2390,11 @@ export class GameEngine {
       this.isSliding = false;
       this.isOnTrainRoof = false;
 
-      // Colorful thruster / hover particle trail in the sky
+      // Colorful thruster particle trail in the sky
       this.jetpackTrailTimer += dt;
       if (this.jetpackTrailTimer >= 0.045) {
         this.jetpackTrailTimer = 0;
-        const trailColors =
-          this.activePowerup === 'jetpack'
-            ? [0xf97316, 0xfacc15, 0x38bdf8, 0xec4899]
-            : [0x38bdf8, 0xfacc15, 0x22c55e];
+        const trailColors = [0xf97316, 0xfacc15, 0x38bdf8, 0xec4899];
         const cHex = trailColors[Math.floor(Math.random() * trailColors.length)];
         this.triggerParticles(this.playerX, this.playerY + 0.3, this.playerZ - 0.6, 4, cHex);
       }
@@ -2518,8 +2512,8 @@ export class GameEngine {
         }
         this.playerBodyGroup.rotation.y = 0;
 
-        // If descending from Jetpack or Hoverboard sky flight, clear landing zone obstacles and grant safe landing invulnerability!
-        if (endedPowerup === 'jetpack' || endedPowerup === 'hoverboard') {
+        // If descending from Jetpack sky flight, clear landing zone obstacles and grant safe landing invulnerability!
+        if (endedPowerup === 'jetpack') {
           this.invulnerableTimer = 2.0;
           for (let i = this.obstacles.length - 1; i >= 0; i--) {
             const obs = this.obstacles[i];
@@ -2551,17 +2545,51 @@ export class GameEngine {
       this.leftLegGroup.rotation.x = 0.22 + Math.sin(this.runAnimTime * 1.4) * 0.12;
       this.rightLegGroup.rotation.x = -0.22 - Math.sin(this.runAnimTime * 1.4) * 0.12;
     } else if (this.activePowerup === 'hoverboard') {
-      // Subway Surfers Sky-Surfing Hoverboard Pose!
-      this.playerBodyGroup.rotation.y = 0.35;
-      if (this.hoverboardMesh) {
-        this.hoverboardMesh.rotation.y = -0.35;
+      // Subway Surfers Ground Surfing Hoverboard Pose! (kankida yerda yursin)
+      if (this.isSliding) {
+        // Sliding crouch on hoverboard
+        this.playerBodyGroup.rotation.y = 0.45;
+        if (this.hoverboardMesh) this.hoverboardMesh.rotation.y = -0.45;
+        this.playerBodyGroup.rotation.x = -0.65;
+        this.playerBodyGroup.position.y = -0.38;
+        this.leftLegGroup.rotation.x = 0.85;
+        this.rightLegGroup.rotation.x = 0.85;
+        this.leftArmGroup.rotation.x = -0.7;
+        this.rightArmGroup.rotation.x = 0.7;
+      } else if (this.isJumping) {
+        // Ollie / air trick on hoverboard
+        this.playerBodyGroup.rotation.y = 0.35;
+        if (this.hoverboardMesh) this.hoverboardMesh.rotation.y = -0.35;
+        this.playerBodyGroup.rotation.x = 0.2;
+        this.playerBodyGroup.position.y = 0;
+        this.leftLegGroup.rotation.x = -0.45;
+        this.rightLegGroup.rotation.x = -0.45;
+        this.leftArmGroup.rotation.x = 0.8;
+        this.rightArmGroup.rotation.x = -0.5;
+      } else {
+        // Ground surf cruise
+        this.playerBodyGroup.rotation.y = 0.35;
+        if (this.hoverboardMesh) this.hoverboardMesh.rotation.y = -0.35;
+        this.playerBodyGroup.rotation.x = 0.06;
+        this.playerBodyGroup.position.y = Math.sin(this.runAnimTime * 0.7) * 0.025;
+        this.leftLegGroup.rotation.x = -0.22;
+        this.rightLegGroup.rotation.x = 0.22;
+        this.leftArmGroup.rotation.x = -0.55;
+        this.rightArmGroup.rotation.x = 0.55;
       }
-      this.playerBodyGroup.rotation.x = 0.08;
-      this.playerBodyGroup.position.y = Math.sin(this.runAnimTime * 0.8) * 0.04;
-      this.leftLegGroup.rotation.x = -0.26;
-      this.rightLegGroup.rotation.x = 0.26;
-      this.leftArmGroup.rotation.x = -0.65;
-      this.rightArmGroup.rotation.x = 0.65;
+
+      // Ground spark & neon jet particles under the hoverboard
+      this.jetpackTrailTimer += dt;
+      if (this.jetpackTrailTimer >= 0.055) {
+        this.jetpackTrailTimer = 0;
+        this.triggerParticles(
+          this.playerX + (Math.random() - 0.5) * 0.3,
+          this.playerY + 0.08,
+          this.playerZ - 0.7,
+          3,
+          Math.random() < 0.5 ? 0x38bdf8 : 0xfacc15
+        );
+      }
     } else if (this.isJumping) {
       // Jump pose: legs tucked back, arms up
       this.playerBodyGroup.rotation.y = 0;
@@ -2632,13 +2660,15 @@ export class GameEngine {
     const criticalChanged =
       this.coins !== this.lastHudCoins ||
       this.health !== this.lastHudHealth ||
-      this.activePowerup !== this.lastHudPowerup;
+      this.activePowerup !== this.lastHudPowerup ||
+      this.mysteryBoxesCollected !== this.lastHudMysteryBoxes;
 
     if (criticalChanged || this.hudUpdateTimer >= 0.1) {
       this.hudUpdateTimer = 0;
       this.lastHudCoins = this.coins;
       this.lastHudHealth = this.health;
       this.lastHudPowerup = this.activePowerup;
+      this.lastHudMysteryBoxes = this.mysteryBoxesCollected;
 
       this.callbacks.onStatsUpdate({
         score: this.score,
@@ -2652,6 +2682,7 @@ export class GameEngine {
         stars: this.calculateStars(),
         chaserClose: this.chaserActive && this.chaserDistance < 5.0,
         currentBiomeName: activeBiome.name,
+        mysteryBoxesCollected: this.mysteryBoxesCollected,
       });
     }
   }
@@ -2873,6 +2904,23 @@ export class GameEngine {
 
     obs.hit = true;
 
+    // Check Hoverboard Protection (Authentic Subway Surfers: Hoverboard saves player from fatal crash!)
+    if (this.activePowerup === 'hoverboard') {
+      this.activePowerup = 'none';
+      this.powerupTimer = 0;
+      if (this.hoverboardMesh) {
+        this.hoverboardMesh.visible = false;
+        this.hoverboardMesh.rotation.y = 0;
+      }
+      this.playerBodyGroup.rotation.y = 0;
+      soundManager.playShieldBreak();
+      this.screenShakeIntensity = 0.35;
+      this.invulnerableTimer = 2.0; // 2 seconds invulnerability after hoverboard crashes
+      this.triggerParticles(this.playerX, 1.2, this.playerZ, 35, 0x38bdf8);
+      this.alertPoliceChaser();
+      return;
+    }
+
     // Check Shield Protection
     if (this.activePowerup === 'shield') {
       this.activePowerup = 'none';
@@ -2967,14 +3015,12 @@ export class GameEngine {
       this.triggerParticles(item.mesh.position.x, this.playerY + 1.2, item.z, 26, 0xf97316);
     } else if (item.type === 'hoverboard') {
       this.activePowerup = 'hoverboard';
-      this.powerupTimer = 12;
+      this.powerupTimer = 30; // 30 seconds authentic Subway Surfers hoverboard surfing!
       if (this.hoverboardMesh) this.hoverboardMesh.visible = true;
       if (this.jetpackMesh) this.jetpackMesh.visible = false;
       this.shieldSphereMesh.visible = false;
-      this.lastSkyCoinZ = Math.max(this.lastSkyCoinZ, this.playerZ + 10);
-      this.ensureSkyCoinsAhead();
       soundManager.playHoverboardPickup();
-      this.triggerParticles(item.mesh.position.x, this.playerY + 1.2, item.z, 26, 0x38bdf8);
+      this.triggerParticles(item.mesh.position.x, this.playerY + 0.2, item.z, 26, 0x38bdf8);
     } else if (item.type === 'magnet') {
       this.activePowerup = 'magnet';
       this.powerupTimer = 10;
@@ -2997,9 +3043,9 @@ export class GameEngine {
       soundManager.playSneakersPickup();
       this.triggerParticles(item.mesh.position.x, 1.2, item.z, 20, 0x22c55e);
     } else if (item.type === 'box') {
-      // Mystery Gift Box (Sovg'a): awards bonus coins, score, and plays special Gift Box sound!
-      this.coins += 20;
-      this.score += 500 * this.multiplier;
+      // Mystery Gift Box (Sovg'a qutisi): saved to open upon game over for surprise rewards!
+      this.mysteryBoxesCollected++;
+      this.score += 250 * this.multiplier;
       soundManager.playGiftBox();
       this.triggerParticles(item.mesh.position.x, 1.3, item.z, 28, 0xfacc15);
     } else if (item.type === 'heart') {
@@ -3063,6 +3109,7 @@ export class GameEngine {
       stars: this.calculateStars(),
       chaserClose: false,
       currentBiomeName: this.levelConfig.biome.name,
+      mysteryBoxesCollected: this.mysteryBoxesCollected,
     };
 
     this.callbacks.onLevelComplete(finalStats);
@@ -3094,6 +3141,7 @@ export class GameEngine {
       stars: 0,
       chaserClose: true,
       currentBiomeName: activeBiome.name,
+      mysteryBoxesCollected: this.mysteryBoxesCollected,
     };
 
     this.callbacks.onGameOver(finalStats);
